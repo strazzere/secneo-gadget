@@ -1,0 +1,28 @@
+{
+  "name": "secneo-gadget",
+  "author": {
+    "email": "diff@protonmail.com",
+    "name": "Tim Strazzere"
+  },
+  "version": "1.0.0",
+  "description": "Gadgets for unpacking secneo protected appliciations",
+  "private": true,
+  "main": "agent/index.ts",
+  "scripts": {
+    "prettier-format": "prettier --config .prettierrc package.json tsconfig.json ./agent/*.ts --write",
+    "prepare": "npm run build",
+    "build": "frida-compile agent/index.ts -o build/_agent.js -c",
+    "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
+    "lint": "npx eslint agent/**/*.ts"
+  },
+  "devDependencies": {
+    "@types/frida-gum": "^17.1.0",
+    "@types/node": "^16.4.8",
+    "@typescript-eslint/eslint-plugin": "^5.30.6",
+    "eslint": "^8.24.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "frida-compile": "^10.0.0",
+    "prettier": "^2.3.2"
+  }
+}
