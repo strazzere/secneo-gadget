@@ -1,8 +1,8 @@
 import { log } from './logger';
 
 export function hookCallFunction(targetLibrary: string, callback?: () => void): boolean {
-  const linkerModuleName = Process.pointerSize === 4 ? 'linker' : 'linker64'
-  const linker = Process.findModuleByName(linkerModuleName)
+  const linkerModuleName = Process.pointerSize === 4 ? 'linker' : 'linker64';
+  const linker = Process.findModuleByName(linkerModuleName);
 
   if (!linker) {
     return false;
