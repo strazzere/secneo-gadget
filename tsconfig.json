@@ -1,15 +1,18 @@
 {
   "compilerOptions": {
     "target": "es2021",
-    "lib": ["es2021"],
+    "lib": ["es2021", "esnext"],
     "allowJs": true,
-    "outDir": "build",
+    "sourceMap": true,
     "strict": true,
+    "outDir": "build",
     "esModuleInterop": true,
     "strictPropertyInitialization": false,
     "moduleResolution": "node"
   },
-  "include": ["src/*"],
+  "include": [
+    "src/*.ts"
+  ],
   "exclude": [
     "src/**/*.spec.ts",
     "node_modules",
