@@ -9,11 +9,11 @@
   "private": true,
   "main": "agent/index.ts",
   "scripts": {
-    "prettier-format": "prettier --config .prettierrc package.json tsconfig.json ./agent/*.ts --write",
+    "prettier-format": "prettier --config .prettierrc package.json tsconfig.json ./jdwp/*.ts ./src/*.ts ./agent/*.ts --write",
     "prepare": "npm run build",
     "build": "frida-compile agent/index.ts -o build/_agent.js -c",
     "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
-    "lint": "npx eslint agent/**/*.ts"
+    "lint": "npx eslint jdwp/*.ts src/*.ts agent/*.ts"
   },
   "devDependencies": {
     "@types/frida-gum": "^17.1.0",
@@ -24,5 +24,8 @@
     "eslint-plugin-prettier": "^4.0.0",
     "frida-compile": "^10.0.0",
     "prettier": "^2.3.2"
+  },
+  "dependencies": {
+    "frida": "^16.0.8"
   }
 }
