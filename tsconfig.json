@@ -3,10 +3,18 @@
     "target": "es2021",
     "lib": ["es2021"],
     "allowJs": true,
-    "noEmit": true,
+    "outDir": "build",
     "strict": true,
     "esModuleInterop": true,
     "strictPropertyInitialization": false,
     "moduleResolution": "node"
-  }
+  },
+  "include": ["src/*"],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "node_modules",
+    "./node_modules",
+    "./node_modules/**/*",
+    "./node_modules/@types/node/index.d.ts"
+  ]
 }
