@@ -2,13 +2,39 @@ import frida, { Application } from 'frida';
 // import { forwardJdwpPort, triggerJdbConnect } from './jdwp';
 
 import fs from 'fs';
-
+import repl from 'repl';
 
 import net from 'net';
 import { exec } from 'child_process';
+import { it } from 'node:test';
 
 const jdwpPort = 8200;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function runFridaServer() {
+  return new Promise((resolve, reject) => {
+    exec(`adb shell ps -A | grep frida`, (error, stdout, stderr) => {
+      if (error) {
+        exec(`adb shell su -c '/data/local/tmp/frida-server'`, (error, stdout, stderr) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          if (stderr) {
+            console.log(`stderr: ${stderr}`);
+            return;
+          }
+          console.log(`stdout: ${stdout}`);
+          resolve(true);
+        });
+        // reject(error);
+        return;
+      }
+      console.log(`Frida is already running, won't start it...`);
+      resolve(true);
+    });
+  });
+}
 
 export async function forwardJdwpPort(pid: number) {
   return new Promise((resolve, reject) => {
@@ -45,12 +71,12 @@ export async function triggerJdbConnect() {
   await delay(100);
 }
 
-
 const agentScript = fs.readFileSync('./build/_agent.js', 'utf8');
 
 const targetIdentifier = 'dji.go.v5';
 
 async function launchtarget() {
+  await delay(1000);
   const device = await frida.getUsbDevice();
 
   if (!device) {
@@ -85,6 +111,12 @@ async function launchtarget() {
   await triggerJdbConnect();
 }
 
+// this is a dangling promise because it shouldn't return for us
+console.log('Running frida-server');
+runFridaServer();
+
 launchtarget().then(() => {
   console.log('Done launching target');
+
+  repl.start('secneo-gadget >');
 });

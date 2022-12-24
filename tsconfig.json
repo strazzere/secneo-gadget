@@ -10,9 +10,7 @@
     "strictPropertyInitialization": false,
     "moduleResolution": "node"
   },
-  "include": [
-    "src/*.ts"
-  ],
+  "include": ["src/*.ts"],
   "exclude": [
     "src/**/*.spec.ts",
     "node_modules",
