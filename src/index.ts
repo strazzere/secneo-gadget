@@ -1,11 +1,11 @@
-import frida, { Application } from 'frida';
-// import { forwardJdwpPort, triggerJdbConnect } from './jdwp';
+import frida, { Application, ScriptRuntime } from 'frida';
 
 import fs from 'fs';
 import repl from 'repl';
 
 import net from 'net';
 import { exec } from 'child_process';
+import { MessageType, ErrorMessage, SendMessage } from 'frida/dist/script';
 
 const jdwpPort = 8200;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,6 +68,17 @@ const agentScript = fs.readFileSync('./build/_agent.js', 'utf8');
 
 const targetIdentifier = 'dji.go.v5';
 
+type decryptedData = {
+  address: number;
+  comment: string;
+};
+
+const decrypted: decryptedData[] = [];
+
+function dumpDecrypted() {
+  fs.writeFileSync(`comments.json`, JSON.stringify(decrypted));
+}
+
 async function launchtarget() {
   await delay(1000);
   const device = await frida.getUsbDevice();
@@ -95,6 +106,21 @@ async function launchtarget() {
   const session = await device.attach(pid);
   console.log(`creating script`);
   const script = await session.createScript(agentScript);
+  script.message.connect((message) => {
+    switch (message.type) {
+      case MessageType.Send:
+        const payload = (message as SendMessage).payload;
+        if (payload?.type === 'decrypt') {
+          decrypted.push(payload?.decrypted);
+        }
+      case MessageType.Error:
+        console.log(`Error received from script: ${(message as ErrorMessage).stack}`);
+        break;
+      default:
+        console.log(`Unknown message type received`);
+    }
+  });
+
   console.log(`loading script`);
   await script.load();
 
@@ -111,5 +137,5 @@ runFridaServer();
 launchtarget().then(() => {
   console.log('Done launching target');
 
-  repl.start('secneo-gadget >');
+  repl.start('secneo-gadget >').context.dump = dumpDecrypted;
 });
