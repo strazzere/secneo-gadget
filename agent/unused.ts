@@ -26,7 +26,7 @@ if (fopenPtr) {
       const mode = args[1].readUtf8String();
       log(`[*] fopen - ${fileName} with mode ${mode}`);
     },
-    onLeave: function (retval) {
+    onLeave: function (_retval) {
       log(Stack.native(this.context));
     },
   });
@@ -39,7 +39,7 @@ if (xorStuff) {
     onEnter: function (args) {
       this.string = args[0];
     },
-    onLeave: function (retval) {
+    onLeave: function (_retval) {
       log(`xorStuff done - ${this.string.readUtf8String()}`);
       log(Stack.native(this.context));
     },
@@ -53,7 +53,7 @@ if (openPtr) {
       const fileName = args[0].readUtf8String();
       log(`[*] open - ${fileName}`);
     },
-    onLeave: function (retval) {
+    onLeave: function (_retval) {
       log(Stack.native(this.context));
     },
   });

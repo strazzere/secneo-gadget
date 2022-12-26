@@ -6,25 +6,22 @@ import repl from 'repl';
 
 import net from 'net';
 import { exec } from 'child_process';
-import { it } from 'node:test';
 
 const jdwpPort = 8200;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function runFridaServer() {
   return new Promise((resolve, reject) => {
-    exec(`adb shell ps -A | grep frida`, (error, stdout, stderr) => {
+    exec(`adb shell ps -A | grep frida`, (error, _stdout, _stderr) => {
       if (error) {
-        exec(`adb shell su -c '/data/local/tmp/frida-server'`, (error, stdout, stderr) => {
+        exec(`adb shell su -c '/data/local/tmp/frida-server'`, (error, _stdout, stderr) => {
           if (error) {
             reject(error);
             return;
           }
           if (stderr) {
-            console.log(`stderr: ${stderr}`);
             return;
           }
-          console.log(`stdout: ${stdout}`);
           resolve(true);
         });
         // reject(error);
@@ -56,10 +53,6 @@ export async function forwardJdwpPort(pid: number) {
 
 export async function triggerJdbConnect() {
   const jdb = net.connect({ host: 'localhost', port: jdwpPort });
-
-  // jdb.on('data', (data: Buffer) => {
-  //   console.log(`data <= ${data.toString('hex')}`);
-  // });
 
   jdb.write(Buffer.from('4a4457502d48616e647368616b65', 'hex'));
   await delay(100);

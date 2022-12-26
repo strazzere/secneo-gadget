@@ -2,16 +2,42 @@ import { log } from './logger';
 import { Stack } from './stack';
 import { hookCallFunction } from './linker';
 
-const debug = false;
-
 const stack = new Stack();
 const getStack = () => {
   log(stack.java());
 };
 
-let hooked: boolean = false;
+let hooked = false;
 
 function hookDexHelper() {
+  const openPtr = Module.findExportByName(null, 'open');
+  if (openPtr) {
+    Interceptor.attach(openPtr, {
+      onEnter: function (args) {
+        const fileName = args[0].readUtf8String();
+        log(`[*] open - ${fileName}`);
+      },
+      onLeave: function (retval) {
+        log(`[*] open retval - ${retval}`);
+        log(Stack.native(this.context));
+      },
+    });
+  }
+
+  const accessPtr = Module.findExportByName(null, 'access');
+  if (accessPtr) {
+    log('[*] hooked access : ', accessPtr);
+    Interceptor.attach(accessPtr, {
+      onEnter: function (args) {
+        this.file = args[0].readUtf8String();
+      },
+      onLeave: function (retval) {
+        log('[+] access :', this.file, 'ret :', retval);
+        log(Stack.native(this.context));
+      },
+    });
+  }
+
   // LOAD:000000000003B484 loc_3B484                               ; CODE XREF: sub_385BC+2EA0↑j
   // LOAD:000000000003B484                 LDR             X0, [X29,#0x108]
   // LOAD:000000000003B488                 MOV             X2, #0x10 ; size_t
@@ -46,7 +72,7 @@ function hookDexHelper() {
         log(Stack.native(this.context));
       },
       onLeave: function (retval) {
-        log(`memcmp equal ret: ${retval.toInt32()}`);
+        log(`memcmp equal ret: ${retval}`);
       },
     });
   }
@@ -56,14 +82,9 @@ function hookDexHelper() {
   if (zipOpen) {
     log('[*] zipOpen : ', zipOpen);
     Interceptor.attach(zipOpen, {
-      onEnter: function (args) {
+      onEnter: function (_args) {
         log(`Hit zipOpen`);
         log(Stack.native(this.context));
-      },
-      onLeave: function (retval) {
-        // if(file.includes("class")) {
-        // console.log("retval : " + retval);
-        // }
       },
     });
   }
@@ -81,11 +102,6 @@ function hookDexHelper() {
         );
         log(Stack.native(this.context));
       },
-      onLeave: function (retval) {
-        // if(file.includes("class")) {
-        // console.log("retval : " + retval);
-        // }
-      },
     });
   }
 
@@ -94,17 +110,13 @@ function hookDexHelper() {
   if (hooked_read) {
     log('[*] hooked_read : ', hooked_read);
     Interceptor.attach(hooked_read, {
-      onEnter: function (args) {
+      onEnter: function (_args) {
         log(`Hit hooked_read`);
         log(Stack.native(this.context));
       },
-      onLeave: function (retval) {
-        // if(file.includes("class")) {
-        // console.log("retval : " + retval);
-        // }
-      },
     });
   }
+
   const strcmp = Module.findExportByName(null, 'strcmp');
   if (strcmp) {
     log('[*] hooked strcmp : ', strcmp);
@@ -133,11 +145,6 @@ function hookDexHelper() {
         );
         log(Stack.native(this.context));
       },
-      onLeave: function (retval) {
-        // if(file.includes("class")) {
-        // console.log("retval : " + retval);
-        // }
-      },
     });
   }
 
@@ -147,36 +154,37 @@ function hookDexHelper() {
   if (_Z14expandedv2dataPciPi) {
     log('[*] _Z14expandedv2dataPciPi : ', _Z14expandedv2dataPciPi);
     Interceptor.attach(_Z14expandedv2dataPciPi, {
-      onEnter: function (args) {
-        log(`Hit _Z14expandedv2dataPciPi - ${args[0].readUtf8String()}`);
+      onEnter: function (_args) {
+        log(`Hit _Z14expandedv2dataPciPi`);
         log(Stack.native(this.context));
-      },
-      onLeave: function (retval) {
-        // if(file.includes("class")) {
-        // console.log("retval : " + retval);
-        // }
       },
     });
   }
+
   // 00000000000894D0                 EXPORT decrypt_jar_128K
   const decrypt_jar_128K = Module.findBaseAddress('libDexHelper.so')?.add(0x894d0);
   if (decrypt_jar_128K) {
     log('[*] decrypt_jar_128K : ', decrypt_jar_128K);
     Interceptor.attach(decrypt_jar_128K, {
-      onEnter: function (args) {
-        // log(`Hit decrypt_jar_128K - ${args[0].readUtf8String()} : ${args[1].readUtf8String()} : ${args[2].readUtf8String()}`);
+      onEnter: function (_args) {
+        log(`Hit decrypt_jar_128K`);
         log(Stack.native(this.context));
-      },
-      onLeave: function (retval) {
-        // if(file.includes("class")) {
-        // console.log("retval : " + retval);
-        // }
       },
     });
   }
 
   // LOAD:0000000000091CBC ; __int64 __fastcall loadInMemoryDgc(unsigned __int8 *, int, unsigned int)
   // LOAD:0000000000091CBC                 EXPORT _Z15loadInMemoryDgcPhij
+  const _Z15loadInMemoryDgcPhij = Module.findBaseAddress('libDexHelper.so')?.add(0x091cbc);
+  if (_Z15loadInMemoryDgcPhij) {
+    log('[*] _Z15loadInMemoryDgcPhij : ', _Z15loadInMemoryDgcPhij);
+    Interceptor.attach(_Z15loadInMemoryDgcPhij, {
+      onEnter: function (_args) {
+        log(`Hit _Z15loadInMemoryDgcPhij`);
+        log(Stack.native(this.context));
+      },
+    });
+  }
 
   // const hookMethods = Module.findExportByName('libDexHelper.so', 'pCDF4A538018372C2F08E8231214F0E82');
   const hookMethods = Module.findBaseAddress('libDexHelper.so')?.add(0x9528c);
@@ -196,21 +204,7 @@ function hookDexHelper() {
             ' replacementPtr : ' +
             replacementPtr,
         );
-        // if (file.includes("class")) {
-        //     console.log("pFDC2B3845DC4F6D62B758260365F3970 " + Memory.readUtf8String(args[0]));
-        // }
-        // console.log(hexdump(args[0], {
-        //     offset: 0,
-        //     length: 0xF,
-        //     header: true,
-        //     ansi: true
-        // }));
         log(Stack.native(this.context));
-      },
-      onLeave: function (retval) {
-        // if(file.includes("class")) {
-        // console.log("retval : " + retval);
-        // }
       },
     });
   }
@@ -232,11 +226,9 @@ if (dlopenPtr) {
         hooked = true;
       }
       this.libName = args[0].readUtf8String();
-      // dlopenFunc = this;
     },
     onLeave: function (retval) {
       log('[*] dlopen :', this.libName, 'ret :', retval);
-      // log(Stack.native(this.context))
     },
   });
 }
@@ -259,7 +251,6 @@ if (dlsymPtr) {
     },
     onLeave: function (retval) {
       log('[*] dlsym - handle :', this.handle, 'funcName :', this.funcName, 'ret :', retval);
-      // log(Stack.native(this.context))
     },
   });
 }
@@ -271,7 +262,6 @@ if (unlinkPtr) {
       log(`Unlink - ${args[0].readUtf8String()}`);
       log(Stack.native(this.context));
     },
-    onLeave: function (retval) {},
   });
 }
 

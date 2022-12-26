@@ -57,7 +57,7 @@ function hookFunction(
       const arrayName = args[0].readCString();
       const functionPointerArray = args[1];
       const count = args[2];
-      const reverse = args[3];
+      const _reverse = args[3];
       const realPath = args[4].readCString();
       if (realPath && realPath.indexOf(targetLibrary) >= 0) {
         const moduleAddress = Module.findBaseAddress(targetLibrary);
