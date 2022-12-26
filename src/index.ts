@@ -1,11 +1,11 @@
-import frida, { Application, ScriptRuntime } from 'frida';
+import frida, { Application } from 'frida';
 
 import fs from 'fs';
 import repl from 'repl';
 
 import net from 'net';
 import { exec } from 'child_process';
-import { MessageType, ErrorMessage, SendMessage } from 'frida/dist/script';
+import { MessageType, ErrorMessage } from 'frida/dist/script';
 
 const jdwpPort = 8200;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -109,10 +109,10 @@ async function launchtarget() {
   script.message.connect((message) => {
     switch (message.type) {
       case MessageType.Send:
-        const payload = (message as SendMessage).payload;
-        if (payload?.type === 'decrypt') {
-          decrypted.push(payload?.decrypted);
+        if (message?.payload?.type === 'decrypt') {
+          decrypted.push(message?.payload?.decrypted);
         }
+        break;
       case MessageType.Error:
         console.log(`Error received from script: ${(message as ErrorMessage).stack}`);
         break;
