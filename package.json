@@ -10,11 +10,11 @@
   "main": "build/index.cjs",
   "type": "module",
   "scripts": {
-    "prettier-format": "prettier --config .prettierrc package.json tsconfig.json ./jdwp/*.ts ./src/*.ts ./agent/*.ts --write",
+    "prettier-format": "prettier --config .prettierrc package.json tsconfig.json ./research/jdwp/*.ts ./src/*.ts ./agent/*.ts --write",
     "prepare": "npm run build",
     "build": "frida-compile agent/index.ts -o build/_agent.js -c && tsc",
     "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
-    "lint": "npx eslint jdwp/*.ts src/*.ts agent/*.ts",
+    "lint": "npx eslint research/jdwp/*.ts src/*.ts agent/*.ts",
     "start": "npm run prepare && node build/index.js"
   },
   "devDependencies": {
