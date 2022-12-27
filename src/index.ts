@@ -5,7 +5,7 @@ import repl from 'repl';
 
 import net from 'net';
 import { exec } from 'child_process';
-import { MessageType, ErrorMessage } from 'frida/dist/script';
+// import { MessageType, ErrorMessage } from 'frida/dist/script';
 
 const jdwpPort = 8200;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -107,18 +107,18 @@ async function launchtarget() {
   console.log(`creating script`);
   const script = await session.createScript(agentScript);
   script.message.connect((message) => {
-    switch (message.type) {
-      case MessageType.Send:
-        if (message?.payload?.type === 'decrypt') {
-          decrypted.push(message?.payload?.decrypted);
-        }
-        break;
-      case MessageType.Error:
-        console.log(`Error received from script: ${(message as ErrorMessage).stack}`);
-        break;
-      default:
-        console.log(`Unknown message type received`);
-    }
+    // switch (message.type) {
+    // case MessageType.Send:
+    //   if (message?.payload?.type === 'decrypt') {
+    //     decrypted.push(message?.payload?.decrypted);
+    //   }
+    //   break;
+    // case MessageType.Error:
+    //   console.log(`Error received from script: ${(message as ErrorMessage).stack}`);
+    //   break;
+    // default:
+    console.log(`Unknown message type received : ${message}`);
+    // }
   });
 
   console.log(`loading script`);

@@ -18,20 +18,6 @@ if (systemPropertyGetPtr) {
   });
 }
 
-const fopenPtr = Module.findExportByName(null, 'fopen');
-if (fopenPtr) {
-  Interceptor.attach(fopenPtr, {
-    onEnter: function (args) {
-      const fileName = args[0].readUtf8String();
-      const mode = args[1].readUtf8String();
-      log(`[*] fopen - ${fileName} with mode ${mode}`);
-    },
-    onLeave: function (_retval) {
-      log(Stack.native(this.context));
-    },
-  });
-}
-
 // Can only be hooked after dex helper is unpacked
 const xorStuff = Module.findBaseAddress('libDexHelper.so')?.add(0x18220);
 if (xorStuff) {
@@ -55,6 +41,23 @@ if (openPtr) {
     },
     onLeave: function (_retval) {
       log(Stack.native(this.context));
+    },
+  });
+}
+
+const strcmp = Module.findExportByName(null, 'strcmp');
+if (strcmp) {
+  log('[*] hooked strcmp : ', strcmp);
+  Interceptor.attach(strcmp, {
+    onEnter: function (args) {
+      this.s1 = args[0].readUtf8String();
+      this.s2 = args[1].readUtf8String();
+    },
+    onLeave: function (retval) {
+      if (retval.toInt32() === 0 && Stack.native(this.context).includes('libDexHelper')) {
+        log(`strcmp(${this.s1}, ${this.s2})`);
+        log(Stack.native(this.context));
+      }
     },
   });
 }

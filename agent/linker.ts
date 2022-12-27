@@ -29,7 +29,7 @@ export function hookCallFunction(
   // https://cs.android.com/android/platform/superproject/+/master:bionic/linker/linker_soinfo.cpp;l=488;bpv=1
   return linker.enumerateSymbols().some((symbol) => {
     if (symbol.name.indexOf('call_array') >= 0) {
-      log(`Found function to hook which is symbol ${symbol}`);
+      log(`Found function to hook which is symbol ${JSON.stringify(symbol)}`);
       return hookFunction(targetLibrary, symbol.address, callback);
     }
     return false;
