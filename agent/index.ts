@@ -7,6 +7,14 @@ const _getStack = () => {
   log(stack.java());
 };
 
+// Oddly this is a string
+const targetedAndroidVersion = '13'
+if (Java.androidVersion !== targetedAndroidVersion) {
+  log(`Unexpected Android version, this script may not work as expected, targeting ${targetedAndroidVersion} but found ${Java.androidVersion}`)
+}
+
+log(`Attempting to work inside pid ${Process.id}`)
+
 let hooked = false;
 
 function hookDexHelper() {
