@@ -151,8 +151,12 @@ function hookDexHelper() {
   if (_Z14expandedv2dataPciPi) {
     log('[*] _Z14expandedv2dataPciPi : ', _Z14expandedv2dataPciPi);
     Interceptor.attach(_Z14expandedv2dataPciPi, {
-      onEnter: function (_args) {
-        log(`Hit _Z14expandedv2dataPciPi`);
+      onEnter: function (args) {
+        log(
+          `Hit _Z14expandedv2dataPciPi : "${args[0].readUtf8String()}" : ${
+            args[1]
+          } : ${args[2].readU32()}`,
+        );
         log(Stack.native(this.context));
       },
     });
@@ -163,9 +167,24 @@ function hookDexHelper() {
   if (decrypt_jar_128K) {
     log('[*] decrypt_jar_128K : ', decrypt_jar_128K);
     Interceptor.attach(decrypt_jar_128K, {
-      onEnter: function (_args) {
+      onEnter: function (args) {
+        this.arg0 = args[0];
         log(`Hit decrypt_jar_128K`);
         log(Stack.native(this.context));
+        hexdump(args[0], {
+          offset: 0,
+          length: 10,
+          header: true,
+          ansi: true,
+        });
+      },
+      onLeave: function (_retval) {
+        hexdump(this.arg0, {
+          offset: 0,
+          length: 10,
+          header: true,
+          ansi: true,
+        });
       },
     });
   }
@@ -208,9 +227,10 @@ function hookDexHelper() {
 }
 
 log(`Calling hookCallFunction`);
-const hookedStuff = hookCallFunction('libDexHelper', (pointer) => {
-  log(`Hit function call back for hookCallFunction and value is ${pointer}`);
-  getStack();
+const hookedStuff = hookCallFunction('libDexHelper', (context, functionName, pointer) => {
+  log(`Hit function call back for hookCallFunction for ${functionName} and value is ${pointer}`);
+  // There is likely to never be anything but a native stack available at this point
+  log(Stack.native(context))
 });
 
 const dlopenPtr = Module.findExportByName(null, 'dlopen');
