@@ -15,7 +15,7 @@ import ida_kernwin
 #     "0x5678": "Comment for address 0x5678",
 #     ...
 # }
-with open("comments.json", "r") as f:
+with open("/home/diff/repo/rednaga/secneo-gadget/ida/comments.json", "r") as f:
 	comments = json.load(f)
 
 imported = 0

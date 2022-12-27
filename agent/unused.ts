@@ -19,6 +19,7 @@ if (systemPropertyGetPtr) {
 }
 
 // Can only be hooked after dex helper is unpacked
+const dexBase = Module.findBaseAddress('libDexHelper.so')
 const xorStuff = Module.findBaseAddress('libDexHelper.so')?.add(0x18220);
 if (xorStuff) {
   Interceptor.attach(xorStuff, {
@@ -26,8 +27,7 @@ if (xorStuff) {
       this.string = args[0];
     },
     onLeave: function (_retval) {
-      log(`xorStuff done - ${this.string.readUtf8String()}`);
-      log(Stack.native(this.context));
+      log(`xorStuff - "${this.returnAddress.sub(dexBase ? dexBase.add(0x4) : 0x4)}": "${this.string.readUtf8String()}",`);
     },
   });
 }
