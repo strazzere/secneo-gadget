@@ -10,7 +10,8 @@ Rebuild APK and ensure it loads the [frida gadget](https://frida.re/docs/gadget/
 
 ```sh
 $ npm install
-$ frida -U -p `frida-ps -U | grep 'RS Fly' | cut -d' ' -f1 ` --no-pause -l _agent.js
+$ npm run build
+$ frida -U -f dji.go.v5 -l build/_agent.js
 ```
 
 ### Development workflow
