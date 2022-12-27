@@ -1,6 +1,6 @@
 import { log } from './logger';
 
-const debug = false
+const debug = false;
 
 /**
  * @param targetLibrary the library to target for early hooking
@@ -18,7 +18,7 @@ export function hookCallFunction(
     return false;
   }
 
-  if (debug){
+  if (debug) {
     log(`got linker;`);
     log(JSON.stringify(linker));
   }
@@ -62,11 +62,10 @@ function hookFunction(
       const functionAddress = args[1];
       const realPath = args[2].readCString();
       if (realPath && realPath.indexOf(targetLibrary) >= 0) {
-        // Module isn't actually loaded yet, so this won't work I don't think...
         const moduleAddress = Module.findBaseAddress(targetLibrary);
         const truePointer = functionAddress.sub(moduleAddress ? moduleAddress : 0x0).sub(0x1);
         if (debug) {
-          log(`[call_function name: ${functionName}, offset: 0x${truePointer}, realpath : ${realPath}`);
+        log(`[call_function name: ${functionName}, offset: ${truePointer}, realpath : ${realPath}`);
         }
         callback?.(this.context, functionName ? functionName : 'NO_NAME', truePointer);
       }

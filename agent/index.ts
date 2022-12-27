@@ -3,7 +3,7 @@ import { Stack } from './stack';
 import { hookCallFunction } from './linker';
 
 const stack = new Stack();
-const getStack = () => {
+const _getStack = () => {
   log(stack.java());
 };
 
@@ -224,62 +224,62 @@ function hookDexHelper() {
       },
     });
   }
-}
 
-log(`Calling hookCallFunction`);
-const hookedStuff = hookCallFunction('libDexHelper', (context, functionName, pointer) => {
-  log(`Hit function call back for hookCallFunction for ${functionName} and value is ${pointer}`);
-  // There is likely to never be anything but a native stack available at this point
-  log(Stack.native(context))
-});
+  const dlopenPtr = Module.findExportByName(null, 'dlopen');
+  if (dlopenPtr) {
+    log('[*] hooked dlopen : ', dlopenPtr);
+    Interceptor.attach(dlopenPtr, {
+      onEnter: function (args) {
+        this.libName = args[0].readUtf8String();
+      },
+      onLeave: function (retval) {
+        log('[*] dlopen :', this.libName, 'ret :', retval);
+      },
+    });
+  }
 
-const dlopenPtr = Module.findExportByName(null, 'dlopen');
-if (dlopenPtr) {
-  log('[*] hooked dlopen : ', dlopenPtr);
-  Interceptor.attach(dlopenPtr, {
-    onEnter: function (args) {
-      if (!hooked && Stack.native(this.context).includes('libDexHelper')) {
-        hookDexHelper();
-        hooked = true;
-      }
-      this.libName = args[0].readUtf8String();
-    },
-    onLeave: function (retval) {
-      log('[*] dlopen :', this.libName, 'ret :', retval);
-    },
-  });
-}
-
-const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
-Interceptor.attach(pthreadCreate, {
-  onEnter(args) {
-    const functionAddress = args[2] as NativePointer;
-    log(`pthread_create : ${functionAddress.toString(16)}`);
-    log(Stack.native(this.context));
-  },
-});
-
-const dlsymPtr = Module.findExportByName(null, 'dlsym');
-if (dlsymPtr) {
-  Interceptor.attach(dlsymPtr, {
-    onEnter: function (args) {
-      this.handle = args[0];
-      this.funcName = args[1].readUtf8String();
-    },
-    onLeave: function (retval) {
-      log('[*] dlsym - handle :', this.handle, 'funcName :', this.funcName, 'ret :', retval);
-    },
-  });
-}
-
-const unlinkPtr = Module.findExportByName(null, 'unlink');
-if (unlinkPtr) {
-  Interceptor.attach(unlinkPtr, {
-    onEnter: function (args) {
-      log(`Unlink - ${args[0].readUtf8String()}`);
+  const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
+  Interceptor.attach(pthreadCreate, {
+    onEnter(args) {
+      const functionAddress = args[2] as NativePointer;
+      log(`pthread_create : ${functionAddress.toString(16)}`);
       log(Stack.native(this.context));
     },
   });
+
+  const dlsymPtr = Module.findExportByName(null, 'dlsym');
+  if (dlsymPtr) {
+    Interceptor.attach(dlsymPtr, {
+      onEnter: function (args) {
+        this.handle = args[0];
+        this.funcName = args[1].readUtf8String();
+      },
+      onLeave: function (retval) {
+        log('[*] dlsym - handle :', this.handle, 'funcName :', this.funcName, 'ret :', retval);
+      },
+    });
+  }
+
+  const unlinkPtr = Module.findExportByName(null, 'unlink');
+  if (unlinkPtr) {
+    Interceptor.attach(unlinkPtr, {
+      onEnter: function (args) {
+        log(`Unlink - ${args[0].readUtf8String()}`);
+        log(Stack.native(this.context));
+      },
+    });
+  }
 }
 
-log(`(Re?)loaded : ${hookedStuff}`);
+log(`Calling hookCallFunction`);
+const hookedStuff = hookCallFunction('libDexHelper.so', (context, functionName, pointer) => {
+  log(`Hit function call back for hookCallFunction for ${functionName} and value is ${pointer}`);
+  // There is likely to never be anything but a native stack available at this point
+  // log(Stack.native(context))
+  if (!hooked) {
+    hookDexHelper();
+    hooked = true;
+  }
+});
+
+log(`${hooked ? '(Re)l' : 'l'}oaded : ${hookedStuff}`);
