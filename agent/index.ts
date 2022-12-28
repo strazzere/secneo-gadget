@@ -8,30 +8,18 @@ const _getStack = () => {
 };
 
 // Oddly this is a string
-const targetedAndroidVersion = '13'
+const targetedAndroidVersion = '13';
 if (Java.androidVersion !== targetedAndroidVersion) {
-  log(`Unexpected Android version, this script may not work as expected, targeting ${targetedAndroidVersion} but found ${Java.androidVersion}`)
+  log(
+    `Unexpected Android version, this script may not work as expected, targeting ${targetedAndroidVersion} but found ${Java.androidVersion}`,
+  );
 }
 
-log(`Attempting to work inside pid ${Process.id}`)
+log(`Attempting to work inside pid ${Process.id}`);
 
 let hooked = false;
 
 function hookDexHelper() {
-  const openPtr = Module.findExportByName(null, 'open');
-  if (openPtr) {
-    Interceptor.attach(openPtr, {
-      onEnter: function (args) {
-        const fileName = args[0].readUtf8String();
-        log(`[*] open - ${fileName}`);
-      },
-      onLeave: function (retval) {
-        log(`[*] open retval - ${retval}`);
-        log(Stack.native(this.context));
-      },
-    });
-  }
-
   const fopenPtr = Module.findExportByName(null, 'fopen');
   if (fopenPtr) {
     Interceptor.attach(fopenPtr, {
@@ -60,45 +48,6 @@ function hookDexHelper() {
     });
   }
 
-  // LOAD:000000000003B484 loc_3B484                               ; CODE XREF: sub_385BC+2EA0↑j
-  // LOAD:000000000003B484                 LDR             X0, [X29,#0x108]
-  // LOAD:000000000003B488                 MOV             X2, #0x10 ; size_t
-  // LOAD:000000000003B48C                 MOV             W19, #0
-  // LOAD:000000000003B490                 LDR             X1, [X0,#0x9C0] ; void *
-  // LOAD:000000000003B494                 MOV             X0, X25 ; void *
-  // LOAD:000000000003B498                 BL              .memcmp
-  // hook the above specific call to .memcmp and inspect the contents
-  // this is likely the md5 (?) check against the original classes.dex for integrity check, I think?
-  const memcmp = Module.findBaseAddress('libDexHelper.so')?.add(0x0003b498);
-  if (memcmp) {
-    log('[*] hooked specific memcmp : ', memcmp);
-    Interceptor.attach(memcmp, {
-      onEnter: function (args) {
-        log('specific memcmp');
-        console.log(
-          hexdump(args[0], {
-            offset: 0,
-            length: args[2].toInt32(),
-            header: true,
-            ansi: true,
-          }),
-        );
-        console.log(
-          hexdump(args[1], {
-            offset: 0,
-            length: args[2].toInt32(),
-            header: true,
-            ansi: true,
-          }),
-        );
-        log(Stack.native(this.context));
-      },
-      onLeave: function (retval) {
-        log(`memcmp equal ret: ${retval}`);
-      },
-    });
-  }
-
   // 00000000000CE44C                 EXPORT zipOpen
   const zipOpen = Module.findExportByName('libDexHelper.so', 'zipOpen');
   if (zipOpen) {
@@ -120,14 +69,91 @@ function hookDexHelper() {
     Interceptor.attach(pA0B37C1ACAF5E4A3E567EF01AC00E282, {
       onEnter: function (args) {
         log(
-          `Hit pA0B37C1ACAF5E4A3E567EF01AC00E282 : ${args[0].toInt32()} : ${args[1].readUtf8String()}}`,
+          `Hit pA0B37C1ACAF5E4A3E567EF01AC00E282 : ${args[0].readU32()} : ${args[1].readUtf8String()}}`,
         );
         log(Stack.native(this.context));
       },
     });
   }
 
-  // 0000000000089E00 hooked_read
+  const systemPropertyGetPtr = Module.findExportByName(null, '__system_property_get');
+  if (systemPropertyGetPtr) {
+    Interceptor.attach(systemPropertyGetPtr, {
+      onEnter: function (args) {
+        this.name = args[0].readUtf8String();
+        if (args[1]) {
+          this.value = args[1].readUtf8String();
+        } else {
+          this.value = null;
+        }
+      },
+      onLeave: function (retval) {
+        log(`__system_property_get("${this.name}", value=${this.value} ) : ${retval}`);
+      },
+    });
+  }
+
+  // This is seemingly an anti-debug trap so we can just patch it out and skip it for the time being
+  // _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v
+  const _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v = Module.findExportByName(
+    'libDexHelper.so',
+    '_Z33p9612F93FF34AFA81C8ABDBB91765B9A6v',
+  );
+  if (_Z33p9612F93FF34AFA81C8ABDBB91765B9A6v) {
+    Interceptor.replace(
+      _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v,
+      new NativeCallback(
+        function () {
+          log('skipping...');
+          return;
+        },
+        'void',
+        ['void'],
+      ),
+    );
+  }
+
+  // p85949C9CA7704A6EFD2777EB9580B669
+  const failing = Module.findExportByName(
+    'libDexHelper.so',
+    '_Z33p85949C9CA7704A6EFD2777EB9580B669i',
+  );
+  if (failing) {
+    log(`Hooking failing function p85949C9CA7704A6EFD2777EB9580B669 at ${failing}`);
+    Interceptor.attach(failing, {
+      onEnter: function (args) {
+        log(`Hit p85949C9CA7704A6EFD2777EB9580B669 ${args[0]}`);
+        log(Stack.native(this.context));
+      },
+    });
+  }
+
+  const get_libart_funaddrP = Module.findExportByName(
+    'libDexHelper.so',
+    'p78C86B081F85A608BB75372604D6C75E',
+  );
+  if (get_libart_funaddrP) {
+    Interceptor.attach(get_libart_funaddrP, {
+      onEnter: function (_args) {
+        log(`Hit get_libart_funaddrP`);
+        log(Stack.native(this.context));
+      },
+    });
+  }
+
+  // LOAD:0000000000093EDC                 EXPORT hookedFunAddr_read
+  const hookedFunAddr_read = Module.findBaseAddress('libDexHelper.so')?.add(0x0000000000093edc);
+  if (hookedFunAddr_read) {
+    log('[*] hookedFunAddr_read : ', hookedFunAddr_read);
+    Interceptor.attach(hookedFunAddr_read, {
+      onEnter: function (_args) {
+        log(`Hit hookedFunAddr_read`);
+        log(Stack.native(this.context));
+      },
+    });
+  }
+
+  // 0000000000089E00 hooked_read 93EDC
   const hooked_read = Module.findBaseAddress('libDexHelper.so')?.add(0x0000000000089e00);
   if (hooked_read) {
     log('[*] hooked_read : ', hooked_read);
@@ -175,24 +201,24 @@ function hookDexHelper() {
   if (decrypt_jar_128K) {
     log('[*] decrypt_jar_128K : ', decrypt_jar_128K);
     Interceptor.attach(decrypt_jar_128K, {
-      onEnter: function (args) {
-        this.arg0 = args[0];
+      onEnter: function (_args) {
+        // this.arg0 = args[0];
         log(`Hit decrypt_jar_128K`);
-        log(Stack.native(this.context));
-        hexdump(args[0], {
-          offset: 0,
-          length: 10,
-          header: true,
-          ansi: true,
-        });
+        // log(Stack.native(this.context));
+        // hexdump(args[0], {
+        //   offset: 0,
+        //   length: 10,
+        //   header: true,
+        //   ansi: true,
+        // });
       },
       onLeave: function (_retval) {
-        hexdump(this.arg0, {
-          offset: 0,
-          length: 10,
-          header: true,
-          ansi: true,
-        });
+        // hexdump(this.arg0, {
+        //   offset: 0,
+        //   length: 10,
+        //   header: true,
+        //   ansi: true,
+        // });
       },
     });
   }
@@ -247,10 +273,11 @@ function hookDexHelper() {
   }
 
   const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
+  log(`Hooking pthread_create : ${pthreadCreate}`);
   Interceptor.attach(pthreadCreate, {
-    onEnter(args) {
+    onEnter: function (args) {
       const functionAddress = args[2] as NativePointer;
-      log(`pthread_create : ${functionAddress.toString(16)}`);
+      log(` ======= >pthread_create : ${functionAddress.toString(16)}`);
       log(Stack.native(this.context));
     },
   });
@@ -274,6 +301,21 @@ function hookDexHelper() {
       onEnter: function (args) {
         log(`Unlink - ${args[0].readUtf8String()}`);
         log(Stack.native(this.context));
+      },
+    });
+  }
+
+  const dexBase = Module.findBaseAddress('libDexHelper.so');
+  if (dexBase) {
+    const findCorrectSharedLibPath = dexBase?.add(0x7cec0);
+    Interceptor.attach(findCorrectSharedLibPath, {
+      onEnter: function (args) {
+        log(`findCorrectSharedLibPath("${args[0].readUtf8String()}")`);
+      },
+      onLeave: function (retval) {
+        log(
+          `returning ${retval.readUtf8String()} from ${this.returnAddress.sub(dexBase).sub(0x1)}`,
+        );
       },
     });
   }

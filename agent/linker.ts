@@ -65,7 +65,9 @@ function hookFunction(
         const moduleAddress = Module.findBaseAddress(targetLibrary);
         const truePointer = functionAddress.sub(moduleAddress ? moduleAddress : 0x0).sub(0x1);
         if (debug) {
-        log(`[call_function name: ${functionName}, offset: ${truePointer}, realpath : ${realPath}`);
+          log(
+            `[call_function name: ${functionName}, offset: ${truePointer}, realpath : ${realPath}`,
+          );
         }
         callback?.(this.context, functionName ? functionName : 'NO_NAME', truePointer);
       }
