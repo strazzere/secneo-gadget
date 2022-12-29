@@ -52,6 +52,29 @@ Extra threads being spun up to detect debuggers;
 0x7022f940 boot.oat!0x93940
 ```
 
+Nuke it via;
+```
+    const antiDebugThreadAddresses = [
+      0x9ec5c, 0xaa97c, 0x9d73c, 0xe3fd0,
+      // 0x9d030,
+      // 0xe3fcc
+    ];
+
+    antiDebugThreadAddresses.forEach((address, index) => {
+      Interceptor.replace(
+        dexBase.add(address),
+        new NativeCallback(
+          function () {
+            log(`===> skipping anti debug thread ${index}...`);
+            return;
+          },
+          'void',
+          ['void'],
+        ),
+      );
+    });
+```
+
 Fake functions that cause seemingly valid crashes;
 
 ```

@@ -76,23 +76,6 @@ function hookDexHelper() {
     });
   }
 
-  const systemPropertyGetPtr = Module.findExportByName(null, '__system_property_get');
-  if (systemPropertyGetPtr) {
-    Interceptor.attach(systemPropertyGetPtr, {
-      onEnter: function (args) {
-        this.name = args[0].readUtf8String();
-        if (args[1]) {
-          this.value = args[1].readUtf8String();
-        } else {
-          this.value = null;
-        }
-      },
-      onLeave: function (retval) {
-        log(`__system_property_get("${this.name}", value=${this.value} ) : ${retval}`);
-      },
-    });
-  }
-
   // This is seemingly an anti-debug trap so we can just patch it out and skip it for the time being
   // _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v
   const _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v = Module.findExportByName(
@@ -272,16 +255,6 @@ function hookDexHelper() {
     });
   }
 
-  const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
-  log(`Hooking pthread_create : ${pthreadCreate}`);
-  Interceptor.attach(pthreadCreate, {
-    onEnter: function (args) {
-      const functionAddress = args[2] as NativePointer;
-      log(` ======= >pthread_create : ${functionAddress.toString(16)}`);
-      log(Stack.native(this.context));
-    },
-  });
-
   const dlsymPtr = Module.findExportByName(null, 'dlsym');
   if (dlsymPtr) {
     Interceptor.attach(dlsymPtr, {
@@ -317,6 +290,40 @@ function hookDexHelper() {
           `returning ${retval.readUtf8String()} from ${this.returnAddress.sub(dexBase).sub(0x1)}`,
         );
       },
+    });
+
+    const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
+    log(`Hooking pthread_create : ${pthreadCreate}`);
+    Interceptor.attach(pthreadCreate, {
+      onEnter: function (args) {
+        const functionAddress = args[2] as NativePointer;
+        log(
+          ` ======= >pthread_create : ${functionAddress.toString(16)} : ${functionAddress
+            .sub(dexBase)
+            .toString(16)}`,
+        );
+        log(Stack.native(this.context));
+      },
+    });
+
+    const antiDebugThreadAddresses = [
+      0x9ec5c, 0xaa97c, 0x9d73c, 0xe3fd0,
+      // 0x9d030,
+      // 0xe3fcc
+    ];
+
+    antiDebugThreadAddresses.forEach((address, index) => {
+      Interceptor.replace(
+        dexBase.add(address),
+        new NativeCallback(
+          function () {
+            log(`===> skipping anti debug thread ${index}...`);
+            return;
+          },
+          'void',
+          ['void'],
+        ),
+      );
     });
   }
 }
