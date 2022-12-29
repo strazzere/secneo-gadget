@@ -19,34 +19,51 @@ log(`Attempting to work inside pid ${Process.id}`);
 
 let hooked = false;
 
-function hookDexHelper() {
-  const fopenPtr = Module.findExportByName(null, 'fopen');
-  if (fopenPtr) {
-    Interceptor.attach(fopenPtr, {
-      onEnter: function (args) {
-        const fileName = args[0].readUtf8String();
-        const mode = args[1].readUtf8String();
-        log(`[*] fopen - ${fileName} with mode ${mode}`);
-      },
-      onLeave: function (_retval) {
-        log(Stack.native(this.context));
-      },
-    });
+function writeDexToFile(address: NativePointer) {
+  try {
+    const dex_size = address.add(0x20).readU32();
+    const file_name =
+      '/data/data/dji.go.v5/unpacked_' + address + '_' + dex_size.toString(0x10) + '.dex';
+    log('[*] Writing dex to', file_name);
+    const dex = address.readByteArray(dex_size);
+    if (dex) {
+      const out = new File(file_name, 'wb');
+      out.write(dex);
+      out.close();
+    }
+  } catch (e) {
+    console.log('[!] ', e);
   }
+}
 
-  const accessPtr = Module.findExportByName(null, 'access');
-  if (accessPtr) {
-    log('[*] hooked access : ', accessPtr);
-    Interceptor.attach(accessPtr, {
-      onEnter: function (args) {
-        this.file = args[0].readUtf8String();
-      },
-      onLeave: function (retval) {
-        log('[+] access :', this.file, 'ret :', retval);
-        log(Stack.native(this.context));
-      },
-    });
-  }
+function hookDexHelper() {
+  // const fopenPtr = Module.findExportByName(null, 'fopen');
+  // if (fopenPtr) {
+  //   Interceptor.attach(fopenPtr, {
+  //     onEnter: function (args) {
+  //       const fileName = args[0].readUtf8String();
+  //       const mode = args[1].readUtf8String();
+  //       log(`[*] fopen - ${fileName} with mode ${mode}`);
+  //       log(Stack.native(this.context));
+  //     },
+  //     onLeave: function (_retval) {
+  //     },
+  //   });
+  // }
+
+  // const accessPtr = Module.findExportByName(null, 'access');
+  // if (accessPtr) {
+  //   log('[*] hooked access : ', accessPtr);
+  //   Interceptor.attach(accessPtr, {
+  //     onEnter: function (args) {
+  //       this.file = args[0].readUtf8String();
+  //     },
+  //     onLeave: function (retval) {
+  //       log('[+] access :', this.file, 'ret :', retval);
+  //       log(Stack.native(this.context));
+  //     },
+  //   });
+  // }
 
   // 00000000000CE44C                 EXPORT zipOpen
   const zipOpen = Module.findExportByName('libDexHelper.so', 'zipOpen');
@@ -68,33 +85,59 @@ function hookDexHelper() {
     log('[*] pA0B37C1ACAF5E4A3E567EF01AC00E282 : ', pA0B37C1ACAF5E4A3E567EF01AC00E282);
     Interceptor.attach(pA0B37C1ACAF5E4A3E567EF01AC00E282, {
       onEnter: function (args) {
-        log(
-          `Hit pA0B37C1ACAF5E4A3E567EF01AC00E282 : ${args[0].readU32()} : ${args[1].readUtf8String()}}`,
-        );
+        log(`Hit pA0B37C1ACAF5E4A3E567EF01AC00E282 : ${args[0]} : ${args[1].readUtf8String()}}`);
+        hexdump(args[0], {
+          offset: 0,
+          length: 10,
+          header: true,
+          ansi: true,
+        });
         log(Stack.native(this.context));
+      },
+      onLeave: function (retval) {
+        log(`pA0B37C1ACAF5E4A3E567EF01AC00E282 retval ${retval}`);
       },
     });
   }
 
   // This is seemingly an anti-debug trap so we can just patch it out and skip it for the time being
   // _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v
-  const _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v = Module.findExportByName(
-    'libDexHelper.so',
-    '_Z33p9612F93FF34AFA81C8ABDBB91765B9A6v',
-  );
-  if (_Z33p9612F93FF34AFA81C8ABDBB91765B9A6v) {
-    Interceptor.replace(
-      _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v,
-      new NativeCallback(
-        function () {
-          log('skipping...');
-          return;
-        },
-        'void',
-        ['void'],
-      ),
-    );
-  }
+  // const _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v = Module.findExportByName(
+  //   'libDexHelper.so',
+  //   '_Z33p9612F93FF34AFA81C8ABDBB91765B9A6v',
+  // );
+  // if (_Z33p9612F93FF34AFA81C8ABDBB91765B9A6v) {
+  //   Interceptor.replace(
+  //     _Z33p9612F93FF34AFA81C8ABDBB91765B9A6v,
+  //     new NativeCallback(
+  //       function () {
+  //         log('skipping...');
+  //         return;
+  //       },
+  //       'void',
+  //       ['void'],
+  //     ),
+  //   );
+  // }
+
+  // _Z33pBB89D708E26FE3A73359BD23D6E2F4D8i
+  // const _Z33p85949C9CA7704A6EFD2777EB9580B669i = Module.findExportByName(
+  //   'libDexHelper.so',
+  //   '_Z33p85949C9CA7704A6EFD2777EB9580B669i',
+  // );
+  // if (_Z33p85949C9CA7704A6EFD2777EB9580B669i) {
+  //   Interceptor.replace(
+  //     _Z33p85949C9CA7704A6EFD2777EB9580B669i,
+  //     new NativeCallback(
+  //       function (int) {
+  //         log('skipping...');
+  //         return 0;
+  //       },
+  //       'int',
+  //       ['int'],
+  //     ),
+  //   );
+  // }
 
   // p85949C9CA7704A6EFD2777EB9580B669
   const failing = Module.findExportByName(
@@ -107,9 +150,40 @@ function hookDexHelper() {
       onEnter: function (args) {
         log(`Hit p85949C9CA7704A6EFD2777EB9580B669 ${args[0]}`);
         log(Stack.native(this.context));
+        // const strstrPtr = Module.findExportByName(null, 'strstr');
+        // if (strstrPtr) {
+        //   Interceptor.attach(strstrPtr, {
+        //     onEnter: function (args) {
+        //       if (!args[1].readUtf8String()?.includes('libart.so')) {
+        //         log(`strstr("${args[0].readUtf8String()}", "${args[1].readUtf8String()}")`)
+        //       }
+        //     },
+        //     onLeave: function (retval) {
+        //       // if (retval) {
+        //       //   log(`strstr retval ${retval}`)
+        //       // }
+        //     },
+        //   });
+        // }
       },
     });
   }
+
+  // const mprotectPtr = Module.findExportByName(null, 'mprotect');
+  // if (mprotectPtr) {
+  //   Interceptor.attach(mprotectPtr, {
+  //     onEnter: function (args) {
+  //       // if (!args[1].readUtf8String()?.includes('libart.so')) {
+  //         log(`>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> mprotectPtr`)
+  //       // }
+  //     },
+  //     onLeave: function (retval) {
+  //       // if (retval) {
+  //       //   log(`strstr retval ${retval}`)
+  //       // }
+  //     },
+  //   });
+  // }
 
   const get_libart_funaddrP = Module.findExportByName(
     'libDexHelper.so',
@@ -169,12 +243,19 @@ function hookDexHelper() {
     log('[*] _Z14expandedv2dataPciPi : ', _Z14expandedv2dataPciPi);
     Interceptor.attach(_Z14expandedv2dataPciPi, {
       onEnter: function (args) {
+        this.args0 = args[0];
         log(
           `Hit _Z14expandedv2dataPciPi : "${args[0].readUtf8String()}" : ${
             args[1]
           } : ${args[2].readU32()}`,
         );
+        // This is the decrypted and decompressed payload from inside the classes.dgc, so write it to disk
+        // this still have missing bytes from the functions though
+        writeDexToFile(args[0]);
         log(Stack.native(this.context));
+      },
+      onLeave: function (_retval) {
+        // At the return it isn't actually going to be fixed, annoyingly
       },
     });
   }
@@ -280,15 +361,61 @@ function hookDexHelper() {
 
   const dexBase = Module.findBaseAddress('libDexHelper.so');
   if (dexBase) {
-    const findCorrectSharedLibPath = dexBase?.add(0x7cec0);
-    Interceptor.attach(findCorrectSharedLibPath, {
+    // const findCorrectSharedLibPath = dexBase?.add(0x7cec0);
+    // Interceptor.attach(findCorrectSharedLibPath, {
+    //   onEnter: function (args) {
+    //     log(`findCorrectSharedLibPath("${args[0].readUtf8String()}")`);
+    //   },
+    //   onLeave: function (retval) {
+    //     log(
+    //       `RETURNING`
+    //       // `returning ${retval.readUtf8String()} from ${this.returnAddress.sub(dexBase).sub(0x1)}`,
+    //     );
+    //   },
+    // });
+
+    // Interceptor.replace(
+    //   dexBase?.add(0x7cec0),
+    //   new NativeCallback(
+    //     function (int) {
+    //       log('skipping...');
+    //       return 0;
+    //     },
+    //     'int', ['int'],
+    //   ),
+    // );
+
+    // For tracking the switched in the broken functions, this is still unclear
+    const switchPtr = dexBase.add(0x71e44);
+    Interceptor.attach(switchPtr, {
       onEnter: function (args) {
-        log(`findCorrectSharedLibPath("${args[0].readUtf8String()}")`);
+        log(
+          ` >>>>>>>>>>>>>>>>>>>>> IT GOT CALLED ${args[0].sub(
+            dexBase,
+          )} : ${args[0].toInt32()} : ${dexBase.add(0x72318).toInt32()}`,
+        );
+      },
+    });
+
+    // For modifiying the flattened control flow to just try and avoid the crash for a bit longer
+    const switchPtr2 = dexBase.add(0x722f4);
+    Interceptor.attach(switchPtr2, {
+      onEnter: function (args) {
+        log(` >>>>>>>>>>>>>>>>>>>>> IT GOT CALLED 2 ${args[0].sub(dexBase)}`);
+        if (args[0].equals(dexBase.add(0x72318))) {
+          args[0] = dexBase.add(0x71e90);
+          log(` >>>>>>>>>>>>>>>>>>>>> IT GOT CHANGED ${args[0].sub(dexBase)}`);
+        }
+      },
+    });
+
+    const getLibSym = dexBase.add(0x7d09c);
+    Interceptor.attach(getLibSym, {
+      onEnter: function (args) {
+        log(`=>>>> Z19get_libart_funaddrPKc("${args[0].readUtf8String()}")`);
       },
       onLeave: function (retval) {
-        log(
-          `returning ${retval.readUtf8String()} from ${this.returnAddress.sub(dexBase).sub(0x1)}`,
-        );
+        log(`=>>>> Z19get_libart_funaddrPKc returning ${retval}`);
       },
     });
 
@@ -306,9 +433,54 @@ function hookDexHelper() {
       },
     });
 
+    const xorStuff = Module.findBaseAddress('libDexHelper.so')?.add(0x18220);
+    if (xorStuff) {
+      Interceptor.attach(xorStuff, {
+        onEnter: function (args) {
+          this.string = args[0];
+        },
+        onLeave: function (_retval) {
+          log(
+            `xorStuff - "${this.returnAddress.sub(
+              dexBase ? dexBase.add(0x4) : 0x4,
+            )}": "${this.string.readUtf8String()}",`,
+          );
+        },
+      });
+    }
+
+    // This is somewhat viable however it doesn't let us get around the other issue we are having...
+    // Seemingly it is easier to just replace 0xaa97c and avoid the kill that way
+    const killPtr = Module.findExportByName(null, 'kill');
+    if (killPtr) {
+      // const kill = new NativeFunction(killPtr, 'int', ['int', 'int']);
+      log('[*] hooked killPtr : ', killPtr);
+      Interceptor.replace(
+        killPtr,
+        new NativeCallback(
+          (pid, sig) => {
+            log(`[+] kill : ${pid} with ${sig}`);
+            // if (Stack.native(this.context).includes('Dexhelper')) {
+            log(`IGNORING KILL`);
+            return 0;
+            // }
+            // log(Stack.native(this.context));
+
+            // return kill(pid, sig)
+          },
+          'int',
+          ['int', 'int'],
+        ),
+      );
+    }
+
     const antiDebugThreadAddresses = [
-      0x9ec5c, 0xaa97c, 0x9d73c, 0xe3fd0,
-      // 0x9d030,
+      0x9ec5c,
+      0xaa97c, // Main anti debug thread, looks for status of files and calls a sys_kill
+      0x9d73c,
+      0xe3fd0, // might not be needed to be blocked?
+
+      0x9d030,
       // 0xe3fcc
     ];
 
@@ -329,7 +501,7 @@ function hookDexHelper() {
 }
 
 log(`Calling hookCallFunction`);
-const hookedStuff = hookCallFunction('libDexHelper.so', (context, functionName, pointer) => {
+const hookedStuff = hookCallFunction('libDexHelper.so', (_context, functionName, pointer) => {
   log(`Hit function call back for hookCallFunction for ${functionName} and value is ${pointer}`);
   // There is likely to never be anything but a native stack available at this point
   // log(Stack.native(context))
