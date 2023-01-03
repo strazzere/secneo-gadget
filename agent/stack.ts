@@ -26,7 +26,10 @@ export class Stack {
       .currentThread()
       .getStackTrace()
       .map((stackLayer: string, index: number) => {
-        stackString = stackString.concat(`${index} => ${stackLayer.toString()}`);
+        // Ignore our own creations on the stack (getStackStrace/getThreadStackTrace)
+        if (index > 1) {
+          stackString = stackString.concat(`${index - 1} => ${stackLayer.toString()}\n`);
+        }
       });
 
     return stackString;
