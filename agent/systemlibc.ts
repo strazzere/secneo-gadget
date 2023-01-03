@@ -1,3 +1,16 @@
+// const openPtr = Module.findExportByName(null, 'open');
+// if (openPtr) {
+//   Interceptor.attach(openPtr, {
+//     onEnter: function (args) {
+//       const fileName = args[0].readUtf8String();
+//       log(`[*] open - ${fileName}`);
+//     },
+//     onLeave: function (_retval) {
+//       log(Stack.native(this.context));
+//     },
+//   });
+// }
+
 // const fopenPtr = Module.findExportByName(null, 'fopen');
 // if (fopenPtr) {
 //   Interceptor.attach(fopenPtr, {
@@ -38,6 +51,32 @@
 //       // if (retval) {
 //       //   log(`strstr retval ${retval}`)
 //       // }
+//     },
+//   });
+// }
+
+// const dlopenPtr = Module.findExportByName(null, 'dlopen');
+// if (dlopenPtr) {
+//   log('[*] hooked dlopen : ', dlopenPtr);
+//   Interceptor.attach(dlopenPtr, {
+//     onEnter: function (args) {
+//       this.libName = args[0].readUtf8String();
+//     },
+//     onLeave: function (retval) {
+//       log('[*] dlopen :', this.libName, 'ret :', retval);
+//     },
+//   });
+// }
+
+// const dlsymPtr = Module.findExportByName(null, 'dlsym');
+// if (dlsymPtr) {
+//   Interceptor.attach(dlsymPtr, {
+//     onEnter: function (args) {
+//       this.handle = args[0];
+//       this.funcName = args[1].readUtf8String();
+//     },
+//     onLeave: function (retval) {
+//       log('[*] dlsym - handle :', this.handle, 'funcName :', this.funcName, 'ret :', retval);
 //     },
 //   });
 // }

@@ -2,7 +2,7 @@ import { log } from './logger';
 import { Stack } from './stack';
 import { writeDexToFile } from './dex';
 
-const dexBase: NativePointer = getDexBase();
+let dexBase: NativePointer;
 
 function getDexBase(): NativePointer {
   const base = Module.findBaseAddress('libDexHelper.so');
@@ -174,6 +174,9 @@ function antiDebugThreadReplacer() {
 }
 
 export function hookDexHelper() {
+  if (!dexBase) {
+    dexBase = getDexBase();
+  }
   antiDebugThreadReplacer();
   // 00000000000CE44C                 EXPORT zipOpen
   // const zipOpen = Module.findExportByName('libDexHelper.so', 'zipOpen');

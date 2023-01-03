@@ -12,12 +12,25 @@ export function antiDebug() {
   ptraceHook();
   tracerHook();
   hookKill();
+  if (debug) {
+    log(` [+] finished hooking anti debug methods`);
+  }
 }
 
 function javaHooks() {
   Java.performNow(() => {
+    javaSystemExit();
     javaProcessKill();
+    javaActivityFinish();
+    javaDestroyActivity();
   });
+}
+
+function javaSystemExit() {
+  const system = Java.use('java.lang.System');
+  system.exit.overload('int').implementation = function (pid: number) {
+    log(` [!] java.lang.System.exit(${pid})`);
+  };
 }
 
 function javaProcessKill() {
@@ -25,6 +38,26 @@ function javaProcessKill() {
   process.killProcess.overload('int').implementation = function (pid: number) {
     log(` [!] android.os.Process.KillProcess(${pid})`);
   };
+}
+
+function javaActivityFinish() {
+  const activity = Java.use('android.app.Activity');
+  activity.finishActivity.overload('int').implementation = function () {
+    log(` [!] android.app.Activity.FinishActivity()`);
+  };
+}
+
+function javaDestroyActivity() {
+  Java.choose('android.app.Activity', {
+    onMatch: function (instance) {
+      instance.onDestroy.overload().implementation = function () {
+        log(` [!] android.app.Activity.onDestroy()`);
+      };
+    },
+    onComplete: function () {
+      // needed?
+    },
+  });
 }
 
 function connectHook() {

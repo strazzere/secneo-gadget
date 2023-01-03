@@ -29,19 +29,6 @@ Process.setExceptionHandler(function (d) {
   return false;
 });
 
-// const openPtr = Module.findExportByName(null, 'open');
-// if (openPtr) {
-//   Interceptor.attach(openPtr, {
-//     onEnter: function (args) {
-//       const fileName = args[0].readUtf8String();
-//       log(`[*] open - ${fileName}`);
-//     },
-//     onLeave: function (_retval) {
-//       log(Stack.native(this.context));
-//     },
-//   });
-// }
-
 log(`Calling hookCallFunction`);
 let hooking = false;
 const hookedStuff = hookCallFunction('libDexHelper.so', (_context, functionName, pointer) => {
