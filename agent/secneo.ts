@@ -2,6 +2,12 @@ import { log } from './logger';
 import { Stack } from './stack';
 import { writeDexToFile } from './dex';
 
+const stack = new Stack();
+
+const getStack = () => {
+  log(stack.java());
+};
+
 let dexBase: NativePointer;
 
 function getDexBase(): NativePointer {
@@ -11,6 +17,20 @@ function getDexBase(): NativePointer {
   }
 
   return base;
+}
+
+export function secneoJavaHooks() {
+  Java.perform(function () {
+    const aw = Java.use(`com.secneo.apkwrapper.AW`);
+    log(`Hooking AW`);
+    aw.attachBaseContext.overload('android.content.Context').implementation = function (
+      context: Java.Wrapper<object>,
+    ) {
+      log(` > attachBaseContext called`);
+      getStack();
+      this.attachBaseContext(context);
+    };
+  });
 }
 
 export function dumpDexFiles() {

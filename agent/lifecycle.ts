@@ -6,9 +6,32 @@ const getStack = () => {
   log(stack.java());
 };
 
+export function hookLifeCycles() {
+  log(`hooking lifecycle code`);
+  hookApplicationStates();
+  hookActivityStates();
+  log(`done hooking lifecycle code`);
+}
+
+export function hookApplicationStates() {
+  Java.performNow(function () {
+    const application = Java.use(`android.app.Application`);
+    application.onCreate.implementation = function () {
+      log(` > onCreate called`);
+      getStack();
+      this.onCreate();
+    };
+
+    application.onTerminate.implementation = function () {
+      log(` > onTerminate called`);
+      getStack();
+      this.onTerminate();
+    };
+  });
+}
+
 export function hookActivityStates() {
   Java.performNow(function () {
-    log(`hooking java code`);
     const activity = Java.use(`android.app.Activity`);
     activity.onResume.implementation = function () {
       log(` > resume called`);
@@ -51,6 +74,5 @@ export function hookActivityStates() {
       getStack();
       this.onRestart();
     };
-    log(`done hooking java code`);
   });
 }

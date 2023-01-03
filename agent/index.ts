@@ -1,9 +1,9 @@
 import { log } from './logger';
 import { Stack } from './stack';
 import { hookCallFunction } from './linker';
-import { hookActivityStates } from './activity';
+import { hookLifeCycles } from './lifecycle';
 import { antiDebug } from './anti';
-import { hookDexHelper } from './secneo';
+import { hookDexHelper, secneoJavaHooks } from './secneo';
 
 const stack = new Stack();
 const _getStack = () => {
@@ -20,7 +20,6 @@ if (Java.androidVersion !== targetedAndroidVersion) {
 
 log(`Attempting to work inside pid ${Process.id}`);
 
-antiDebug();
 let hooked = false;
 
 Process.setExceptionHandler(function (d) {
@@ -36,8 +35,10 @@ const hookedStuff = hookCallFunction('libDexHelper.so', (_context, functionName,
   // There is likely to never be anything but a native stack available at this point
   // log(Stack.native(context))
   if (!hooked || !hooking) {
-    hookActivityStates();
     hooking = true;
+    antiDebug();
+    secneoJavaHooks();
+    hookLifeCycles();
     hookDexHelper();
     hooked = true;
   }

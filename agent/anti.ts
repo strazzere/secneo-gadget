@@ -22,7 +22,7 @@ function javaHooks() {
     javaSystemExit();
     javaProcessKill();
     javaActivityFinish();
-    javaDestroyActivity();
+    javaActivityDestroy();
   });
 }
 
@@ -47,7 +47,7 @@ function javaActivityFinish() {
   };
 }
 
-function javaDestroyActivity() {
+function javaActivityDestroy() {
   Java.choose('android.app.Activity', {
     onMatch: function (instance) {
       instance.onDestroy.overload().implementation = function () {
