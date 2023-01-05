@@ -12,6 +12,9 @@ export function antiDebug() {
   ptraceHook();
   tracerHook();
   hookKill();
+  hookAbort();
+  hookExits();
+  hookRaise();
   if (debug) {
     log(` [+] finished hooking anti debug methods`);
   }
@@ -164,9 +167,12 @@ function tracerHook() {
         function (stream, size, fp) {
           const retval = fgets(stream, size, fp);
           const str = stream.readUtf8String();
-          if (str && str.indexOf('TracerPid:') > -1) {
-            stream.writeUtf8String('TracerPid:\t0');
-            log(` [!] tracer : changing fgets buffer to have no tracer pid`);
+          if (str && str !== 'TracerPid:\t0\n' && str.indexOf('TracerPid:') > -1) {
+            log(Buffer.from(str).toString('hex'));
+            stream.writeUtf8String('TracerPid:\t0\n');
+            log(
+              ` [!] tracer : changing fgets buffer to have no tracer pid from ${this.context.pc}`,
+            );
           }
           return retval;
         },
@@ -186,13 +192,105 @@ function hookKill() {
     Interceptor.replace(
       killPtr,
       new NativeCallback(
-        (pid, sig) => {
+        function (pid, sig) {
           log(`[+] kill : ${pid} with ${sig}`);
           log(`IGNORING KILL`);
           return 0;
         },
         'int',
         ['int', 'int'],
+      ),
+    );
+  }
+}
+
+function hookAbort() {
+  const abortPtr = Module.findExportByName('libc.so', 'abort');
+  if (abortPtr) {
+    if (debug) {
+      log(` [+] antidebug : abort hooked @ ${abortPtr}`);
+    }
+    Interceptor.replace(
+      abortPtr,
+      new NativeCallback(
+        function (status) {
+          log(`[+] abort : ${status}`);
+          log(`IGNORING ABORT`);
+          return 0;
+        },
+        'int',
+        ['int'],
+      ),
+    );
+  }
+}
+
+function hookExits() {
+  hookExit();
+  hook_exit();
+}
+
+function hookExit() {
+  const exitPtr = Module.findExportByName('libc.so', 'exit');
+  if (exitPtr) {
+    if (debug) {
+      log(` [+] antidebug : exit hooked @ ${exitPtr}`);
+    }
+    Interceptor.replace(
+      exitPtr,
+      new NativeCallback(
+        function (status) {
+          log(`[+] exit : ${status}`);
+          log(`IGNORING EXIT`);
+          return 0;
+        },
+        'int',
+        ['int'],
+      ),
+    );
+  }
+}
+
+function hook_exit() {
+  const _exitPtr = Module.findExportByName('libc.so', '_exit');
+  if (_exitPtr) {
+    if (debug) {
+      log(` [+] antidebug : _exit hooked @ ${_exitPtr}`);
+    }
+
+    const _exit = new NativeFunction(_exitPtr, 'int', ['int']);
+
+    Interceptor.replace(
+      _exitPtr,
+      new NativeCallback(
+        function (status) {
+          log(`[+] _exit : ${status} from ${this.context.pc}`);
+          return _exit(status);
+        },
+        'int',
+        ['int'],
+      ),
+    );
+  }
+}
+
+function hookRaise() {
+  const raisePtr = Module.findExportByName('libc.so', 'raise');
+  if (raisePtr) {
+    if (debug) {
+      log(` [+] antidebug : raise hooked @ ${raisePtr}`);
+    }
+    Interceptor.replace(
+      raisePtr,
+      new NativeCallback(
+        function (signal) {
+          log(`[+] raise : ${signal}`);
+          log(`IGNORING RAISE`);
+          log(Stack.native(this.context));
+          return 0;
+        },
+        'int',
+        ['int'],
       ),
     );
   }
