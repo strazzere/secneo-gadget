@@ -23,7 +23,7 @@ log(`Attempting to work inside pid ${Process.id}`);
 let hooked = false;
 
 Process.setExceptionHandler(function (d) {
-  console.log(`exception caught : ${d} : ${d.context.pc} : ${d.address}`);
+  console.log(`Exception caught : ${d} : ${d.context.pc} : ${d.address}`);
   log(Stack.native(d.context));
   return false;
 });
@@ -34,7 +34,7 @@ const hookedStuff = hookCallFunction('libDexHelper.so', (_context, functionName,
   log(`Hit function call back for hookCallFunction for ${functionName} and value is ${pointer}`);
   // There is likely to never be anything but a native stack available at this point
   // log(Stack.native(context))
-  if (!hooked || !hooking) {
+  if (!hooked && !hooking) {
     hooking = true;
     antiDebug();
     secneoJavaHooks();

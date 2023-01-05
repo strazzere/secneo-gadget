@@ -118,76 +118,74 @@ function antiDebugThreadReplacer() {
   Interceptor.attach(pthreadCreate, {
     onEnter: function (args) {
       const functionAddress = args[2] as NativePointer;
-      log(
-        ` ======= >pthread_create : ${functionAddress.toString(16)} : ${functionAddress
-          .sub(dexBase)
-          .toString(16)}`,
-      );
-      if (functionAddress.equals(dexBase.add(0x9ec5c))) {
-        log('REPLACING');
-        Interceptor.replace(
-          dexBase.add(0x9ec5c),
-          new NativeCallback(
-            function () {
-              log(`===> skipping anti debug thread annoying...`);
-              return;
-            },
-            'void',
-            ['void'],
-          ),
-        );
-      } else if (functionAddress.equals(dexBase.add(0xaa97c))) {
-        log('REPLACING 2');
-        Interceptor.replace(
-          dexBase.add(0xaa97c),
-          new NativeCallback(
-            function () {
-              log(`===> skipping anti debug thread annoying 2...`);
-              return;
-            },
-            'void',
-            ['void'],
-          ),
-        );
-      } else if (functionAddress.equals(dexBase.add(0x9d73c))) {
-        log('REPLACING 3');
-        Interceptor.replace(
-          dexBase.add(0x9d73c),
-          new NativeCallback(
-            function () {
-              log(`===> skipping anti debug thread annoying 3...`);
-              return;
-            },
-            'void',
-            ['void'],
-          ),
-        );
-      } else if (functionAddress.equals(dexBase.add(0xe3fd0))) {
-        log('REPLACING 4');
-        Interceptor.replace(
-          dexBase.add(0xe3fd0),
-          new NativeCallback(
-            function () {
-              log(`===> skipping anti debug thread annoying 4...`);
-              return;
-            },
-            'void',
-            ['void'],
-          ),
-        );
-      } else if (functionAddress.equals(dexBase.add(0x9d030))) {
-        log('REPLACING 5');
-        Interceptor.replace(
-          dexBase.add(0x9d030),
-          new NativeCallback(
-            function () {
-              log(`===> skipping anti debug thread annoying 5...`);
-              return;
-            },
-            'void',
-            ['void'],
-          ),
-        );
+      // Only step into extended functionality if the spawned thread originates from our
+      // target library
+      if (DebugSymbol.fromAddress(functionAddress).moduleName?.includes('DexHelper')) {
+        log(` ======= >pthread_create : ${functionAddress} : ${functionAddress.sub(dexBase)}`);
+        if (functionAddress.equals(dexBase.add(0x9ec5c))) {
+          Interceptor.replace(
+            dexBase.add(0x9ec5c),
+            new NativeCallback(
+              function () {
+                log(`===> skipping anti debug thread 1...`);
+                return;
+              },
+              'void',
+              ['void'],
+            ),
+          );
+        } else if (functionAddress.equals(dexBase.add(0xaa97c))) {
+          Interceptor.replace(
+            dexBase.add(0xaa97c),
+            new NativeCallback(
+              function () {
+                log(`===> skipping anti debug thread 2...`);
+                return;
+              },
+              'void',
+              ['void'],
+            ),
+          );
+        } else if (functionAddress.equals(dexBase.add(0x9d73c))) {
+          Interceptor.replace(
+            dexBase.add(0x9d73c),
+            new NativeCallback(
+              function () {
+                log(`===> skipping anti debug thread 3...`);
+                return;
+              },
+              'void',
+              ['void'],
+            ),
+          );
+        } else if (functionAddress.equals(dexBase.add(0xe3fd0))) {
+          Interceptor.replace(
+            dexBase.add(0xe3fd0),
+            new NativeCallback(
+              function () {
+                log(`===> skipping anti debug thread 4...`);
+                return;
+              },
+              'void',
+              ['void'],
+            ),
+          );
+        } else if (functionAddress.equals(dexBase.add(0x9d030))) {
+          Interceptor.replace(
+            dexBase.add(0x9d030),
+            new NativeCallback(
+              function () {
+                log(`===> skipping anti debug thread 5...`);
+                return;
+              },
+              'void',
+              ['void'],
+            ),
+          );
+        } else {
+          log(`===> pthread_create(${functionAddress}) for unknown thread`);
+          log(Stack.native(this.context));
+        }
       }
     },
   });
