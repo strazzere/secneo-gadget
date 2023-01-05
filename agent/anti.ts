@@ -265,6 +265,9 @@ function hook_exit() {
       new NativeCallback(
         function (status) {
           log(`[+] _exit : ${status} from ${this.context.pc}`);
+          // if you return 0 here, it will prevent anything outside of a kill signal
+          // from nuking the process, this can be useful to grab the maps if needed
+          // return 0
           return _exit(status);
         },
         'int',
