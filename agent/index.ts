@@ -4,6 +4,7 @@ import { hookCallFunction } from './linker';
 import { hookLifeCycles } from './lifecycle';
 import { antiDebug } from './anti';
 import { hookDexHelper, secneoJavaHooks } from './secneo';
+import { inotifyHooks } from './inotify';
 
 const stack = new Stack();
 const _getStack = () => {
@@ -39,6 +40,7 @@ const hookedStuff = hookCallFunction('libDexHelper.so', (_context, functionName,
     antiDebug();
     secneoJavaHooks();
     hookLifeCycles();
+    inotifyHooks();
     hookDexHelper();
     hooked = true;
   }
