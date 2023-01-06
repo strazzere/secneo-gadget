@@ -1,5 +1,4 @@
 import { log } from './logger';
-import { Stack } from './stack';
 
 const debug = true;
 
@@ -27,7 +26,6 @@ function inotifyInitHook() {
     Interceptor.attach(inotify_initPtr, {
       onLeave: function (retval) {
         log(` [!] inotify_init : fd : ${retval}`);
-        log(Stack.native(this.context));
       },
     });
   }
@@ -68,24 +66,24 @@ enum INOTIFY_FLAGS {
 }
 
 function parseFlags(flags: number) {
-  let ret = ''
-  const strings = Object.keys(INOTIFY_FLAGS)
-  const values = Object.values(INOTIFY_FLAGS)
+  let ret = '';
+  const strings = Object.keys(INOTIFY_FLAGS);
+  const values = Object.values(INOTIFY_FLAGS);
 
   values.forEach((value, index) => {
     if ((flags & Number(value)) !== 0) {
       if (ret.length > 0) {
-        ret = ret.concat(' | ')
+        ret = ret.concat(' | ');
       }
-      ret = ret.concat(strings[index])
+      ret = ret.concat(strings[index]);
     }
-  })
+  });
 
   if (ret === '') {
-    return 'null'
+    return 'null';
   }
- 
-  return ret
+
+  return ret;
 }
 
 function inotifyAddHook() {
@@ -101,7 +99,6 @@ function inotifyAddHook() {
         const path = args[1].readUtf8String();
         const flags = args[2].toUInt32();
         log(` [+] inotify_add_watch(${inotify_fd}, ${path}, ${parseFlags(flags)})`);
-        log(Stack.native(this.context));
       },
     });
   }
@@ -120,7 +117,6 @@ function inotifyRmHook() {
         const path = args[1].readUtf8String();
         const flags = args[2].toUInt32();
         log(` [-] inotify_rm_watch(${inotify_fd}, ${path}, ${parseFlags(flags)})`);
-        log(Stack.native(this.context));
       },
     });
   }
