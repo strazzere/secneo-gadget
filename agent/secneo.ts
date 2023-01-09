@@ -1,6 +1,7 @@
 import { log } from './logger';
 import { Stack } from './stack';
 import { writeDexToFile } from './dex';
+import { systemlibcHooks } from './systemlibc';
 
 const stack = new Stack();
 
@@ -60,6 +61,44 @@ export function dumpDexFiles() {
   }
 }
 
+// Experimental - this doesn't seem to ever get hit
+export function forkerEtc() {
+  const forkerPtr = dexBase.add(0x9E40C)
+  Interceptor.attach(forkerPtr, {
+    onEnter: function (args) {
+      log(`[*] fork was hit`)
+    },
+  });
+}
+
+// Experimental, this is the hook for an svc call to __NR_kill (sys kill)
+function sysKillHook() {
+  const sysKillPtr = Module.findExportByName('libDexHelper.so', 'p8A01F8A04CC4D64E56A88E4D1466B151')
+  // const sysKillPtr = dexBase.add(0xA8E00)
+  if (sysKillPtr) {
+    log(` hooked syskill p8A01F8A04CC4D64E56A88E4D1466B151`)
+    Interceptor.attach(sysKillPtr, {
+      onEnter: function (args) {
+        log(`************** hit a sys kill ptr!`)
+      },
+    });
+  }
+}
+
+// Experimental - this is the thread that would have called the above sys kill call
+function antiDebugStarter() {
+  const sysKillPtr = Module.findExportByName('libDexHelper.so', 'pDC54CD4743EC5AAF6F30EA9C1C92801D')
+  // const sysKillPtr = dexBase.add(0xA8E00)
+  if (sysKillPtr) {
+    log(` hooked syskill pDC54CD4743EC5AAF6F30EA9C1C92801D`)
+    Interceptor.attach(sysKillPtr, {
+      onEnter: function (args) {
+        log(`************** hit a sys pDC54CD4743EC5AAF6F30EA9C1C92801DpDC54CD4743EC5AAF6F30EA9C1C92801DpDC54CD4743EC5AAF6F30EA9C1C92801D!`)
+      },
+    });
+  }
+}
+
 export function deobfuscateStrings() {
   const xorStuff = dexBase.add(0x18220);
   Interceptor.attach(xorStuff, {
@@ -74,6 +113,20 @@ export function deobfuscateStrings() {
       );
     },
   });
+
+  const unroller = dexBase.add(0x9E26C)
+  Interceptor.attach(unroller, {
+    onEnter: function (args) {
+      this.stringPtr = args[0];
+    },
+    onLeave: function (_retval) {
+      log(
+        `unroller - "${this.returnAddress.sub(
+          dexBase ? dexBase.add(0x4) : 0x4,
+        )}": "${this.stringPtr.readUtf8String()}",`,
+      );
+    },
+  });
 }
 
 /**
@@ -81,7 +134,7 @@ export function deobfuscateStrings() {
  * for frida to finish, we may be missing things during this
  * period of time?
  */
-function antiDebugThreadBlockerReplaceThreadFunctions() {
+function _antiDebugThreadBlockerReplaceThreadFunctions() {
   const antiDebugThreadAddresses = [
     0x9ec5c,
     0xaa97c, // Main anti debug thread, looks for status of files and calls a sys_kill
@@ -107,12 +160,32 @@ function antiDebugThreadBlockerReplaceThreadFunctions() {
   });
 }
 
+export function antiDebugStrStr() {
+  const discountStrStrPtr = dexBase.add(0x9de68);
+  Interceptor.attach(discountStrStrPtr, {
+    onEnter: function (args) {
+      this.arg0 = args[0].readUtf8String()
+      const buf = Memory.allocUtf8String('derp');
+      this.buf = buf;
+      args[1] = buf;
+      this.arg1 = args[1].readUtf8String()
+    },
+    onLeave: function (retval) {
+      log(`discountStrStr("${this.arg0}", "${this.arg1}") : ${retval}`);
+      if (!retval.equals(0)) {
+         log(` [!] replacing discountStrStr retval with 0`);
+        retval.replace(ptr(0))
+      }
+    },
+  });
+}
+
 /**
  * Similar to the above, targets the same threads being created,
  * however it replaces them during the pthread_create call, which
  * seems to "block" the execution better.
  */
-function antiDebugThreadReplacer() {
+export function antiDebugThreadReplacer() {
   const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
   log(`Hooking pthread_create : ${pthreadCreate}`);
   Interceptor.attach(pthreadCreate, {
@@ -122,7 +195,11 @@ function antiDebugThreadReplacer() {
       // target library
       if (DebugSymbol.fromAddress(functionAddress).moduleName?.includes('DexHelper')) {
         log(` ======= >pthread_create : ${functionAddress} : ${functionAddress.sub(dexBase)}`);
+        // This will represent itself as segmentation faults if runs, it will also clear the pc / stack while accessing
+        // unknown memory
         if (functionAddress.equals(dexBase.add(0x9ec5c))) {
+          systemlibcHooks();
+          antiDebugStrStr()
           Interceptor.replace(
             dexBase.add(0x9ec5c),
             new NativeCallback(
@@ -147,6 +224,7 @@ function antiDebugThreadReplacer() {
             ),
           );
         } else if (functionAddress.equals(dexBase.add(0x9d73c))) {
+          // Performs inotify stuff
           Interceptor.replace(
             dexBase.add(0x9d73c),
             new NativeCallback(
@@ -195,7 +273,9 @@ export function hookDexHelper() {
   if (!dexBase) {
     dexBase = getDexBase();
   }
-  antiDebugThreadReplacer();
+  antiDebugStarter()
+  sysKillHook()
+  deobfuscateStrings()
   // 00000000000CE44C                 EXPORT zipOpen
   // const zipOpen = Module.findExportByName('libDexHelper.so', 'zipOpen');
   // if (zipOpen) {
@@ -473,4 +553,6 @@ export function hookDexHelper() {
   //     }
   //   },
   // });
+
+  deobfuscateStrings()
 }
