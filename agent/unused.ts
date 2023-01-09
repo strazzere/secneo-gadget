@@ -49,23 +49,6 @@ if (openPtr) {
   });
 }
 
-const strcmp = Module.findExportByName(null, 'strcmp');
-if (strcmp) {
-  log('[*] hooked strcmp : ', strcmp);
-  Interceptor.attach(strcmp, {
-    onEnter: function (args) {
-      this.s1 = args[0].readUtf8String();
-      this.s2 = args[1].readUtf8String();
-    },
-    onLeave: function (retval) {
-      if (retval.toInt32() === 0 && Stack.native(this.context).includes('libDexHelper')) {
-        log(`strcmp(${this.s1}, ${this.s2})`);
-        log(Stack.native(this.context));
-      }
-    },
-  });
-}
-
 // LOAD:000000000003B484 loc_3B484                               ; CODE XREF: sub_385BC+2EA0↑j
 // LOAD:000000000003B484                 LDR             X0, [X29,#0x108]
 // LOAD:000000000003B488                 MOV             X2, #0x10 ; size_t
