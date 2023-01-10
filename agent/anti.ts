@@ -3,6 +3,11 @@ import { Stack } from './stack';
 
 const debug = true;
 
+const stack = new Stack();
+const getStack = () => {
+  log(stack.java());
+};
+
 export function antiDebug() {
   javaHooks();
   connectHook();
@@ -33,6 +38,7 @@ function javaSystemExit() {
   const system = Java.use('java.lang.System');
   system.exit.overload('int').implementation = function (pid: number) {
     log(` [!] java.lang.System.exit(${pid})`);
+    getStack();
   };
 }
 
@@ -40,6 +46,7 @@ function javaProcessKill() {
   const process = Java.use('android.os.Process');
   process.killProcess.overload('int').implementation = function (pid: number) {
     log(` [!] android.os.Process.KillProcess(${pid})`);
+    getStack();
   };
 }
 
