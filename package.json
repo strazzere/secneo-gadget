@@ -15,7 +15,8 @@
     "build": "frida-compile agent/index.ts -o build/_agent.js -c && tsc",
     "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
     "lint": "npx eslint research/jdwp/*.ts src/*.ts agent/*.ts",
-    "start": "npm run prepare && node build/index.js"
+    "start": "npm run prepare && node build/index.js",
+    "spawn": "frida -U -f dji.go.v5 -l build/_agent.js"
   },
   "devDependencies": {
     "@types/frida-gum": "^17.1.0",
