@@ -26,6 +26,7 @@ const targetLibrary = 'libDexHelper.so';
 
 antiDebugThreadReplacer();
 dlopenExtHook(targetLibrary, function (_context) {
+  hooked = true;
   antiDebug();
   secneoJavaHooks();
   hookLifeCycles();

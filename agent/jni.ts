@@ -86,7 +86,7 @@ export function loadNativeLib(targetLibrary: string, callback?: (context: CpuCon
   );
   if (loadNativeLibPtr) {
     Interceptor.attach(loadNativeLibPtr, {
-      onEnter: function (args) {
+      onEnter: function (_args) {
         // args[1] is a std::string which contains the library, but this is a bit
         // of an annoyance to parse correctly
         hookJniLoad(targetLibrary, callback);
