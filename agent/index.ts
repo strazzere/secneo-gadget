@@ -1,11 +1,10 @@
 import { log } from './logger';
 import { Stack } from './stack';
-import { hookCallFunction } from './linker';
 import { hookLifeCycles } from './lifecycle';
 import { antiDebug } from './anti';
-import { hookDexHelper, secneoJavaHooks } from './secneo';
+import { hookDexHelper, secneoJavaHooks, antiDebugThreadReplacer } from './secneo';
 import { inotifyHooks } from './inotify';
-import { memoryHooks } from './mem';
+import { dlopenExtHook } from './jni';
 
 const stack = new Stack();
 const _getStack = () => {
@@ -23,29 +22,26 @@ if (Java.androidVersion !== targetedAndroidVersion) {
 log(`Attempting to work inside pid ${Process.id}`);
 
 let hooked = false;
+const targetLibrary = 'libDexHelper.so';
+
+antiDebugThreadReplacer();
+dlopenExtHook(targetLibrary, function (_context) {
+  antiDebug();
+  secneoJavaHooks();
+  hookLifeCycles();
+  inotifyHooks();
+  hookDexHelper();
+});
 
 Process.setExceptionHandler(function (d) {
-  console.log(`Exception caught : ${d} : ${d.context.pc} : ${d.address}`);
-  log(Stack.native(d.context));
+  const affectedModule = Process.findModuleByAddress(d.address);
+  console.log(
+    `Exception caught : ${d} : (pc :${d.context.pc}) : ${d.address} : ${affectedModule?.base.sub(
+      d.address,
+    )}`,
+  );
+  // log(Stack.native(d.context));
   return false;
 });
 
-log(`Calling hookCallFunction`);
-let hooking = false;
-const hookedStuff = hookCallFunction('libDexHelper.so', (_context, functionName, pointer) => {
-  log(`Hit function call back for hookCallFunction for ${functionName} and value is ${pointer}`);
-  // There is likely to never be anything but a native stack available at this point
-  // log(Stack.native(context))
-  if (!hooked && !hooking) {
-    hooking = true;
-    antiDebug();
-    secneoJavaHooks();
-    hookLifeCycles();
-    inotifyHooks();
-    memoryHooks();
-    hookDexHelper();
-    hooked = true;
-  }
-});
-
-log(`${hooked ? '(Re)l' : 'l'}oaded : ${hookedStuff}`);
+log(`${hooked ? '(Re)l' : 'l'}oaded`);
