@@ -34,9 +34,8 @@ dlopenExtHook(targetLibrary, function (_context) {
 });
 
 Process.setExceptionHandler(function (d) {
-  const affectedModule = Process.findModuleByAddress(d.address);
   console.log(
-    `Exception caught : ${d} : (pc :${d.context.pc}) : ${d.address} : ${affectedModule?.base.sub(
+    `Exception caught : ${d} : (pc :${d.context.pc}) : ${d.address} : ${Stack.getModuleInfo(
       d.address,
     )}`,
   );
