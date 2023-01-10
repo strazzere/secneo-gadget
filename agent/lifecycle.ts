@@ -7,10 +7,10 @@ const getStack = () => {
 };
 
 export function hookLifeCycles() {
-  log(`hooking lifecycle code`);
+  log(` [+] hooking lifecycle code`);
   hookApplicationStates();
   hookActivityStates();
-  log(`done hooking lifecycle code`);
+  log(` [+] done hooking lifecycle code`);
 }
 
 export function hookApplicationStates() {
