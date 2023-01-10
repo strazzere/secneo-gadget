@@ -9,7 +9,7 @@ export function systemlibcHooks() {
   }
 
   openHook();
-  // fopenHook();
+  fopenHook();
   strcmpHook();
 
   if (debug) {
@@ -38,7 +38,7 @@ function fopenHook() {
         const fileName = args[0].readUtf8String();
         const mode = args[1].readUtf8String();
         log(`[*] fopen - ${fileName} with mode ${mode}`);
-        // log(Stack.native(this.context));
+        log(Stack.native(this.context));
       },
     });
   }
@@ -73,22 +73,6 @@ function strcmpHook() {
 //     onLeave: function (retval) {
 //       log('[+] access :', this.file, 'ret :', retval);
 //       log(Stack.native(this.context));
-//     },
-//   });
-// }
-
-// const mprotectPtr = Module.findExportByName(null, 'mprotect');
-// if (mprotectPtr) {
-//   Interceptor.attach(mprotectPtr, {
-//     onEnter: function (args) {
-//       // if (!args[1].readUtf8String()?.includes('libart.so')) {
-//         log(`>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> mprotectPtr`)
-//       // }
-//     },
-//     onLeave: function (retval) {
-//       // if (retval) {
-//       //   log(`strstr retval ${retval}`)
-//       // }
 //     },
 //   });
 // }
