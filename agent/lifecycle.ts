@@ -45,10 +45,12 @@ export function hookActivityStates() {
       this.onDestroy();
     };
 
-    activity.onCreate.overload('android.os.Bundle').implementation = function () {
+    activity.onCreate.overload('android.os.Bundle').implementation = function (
+      bundle: Java.Wrapper<object>,
+    ) {
       log(` > create called`);
       getStack();
-      this.onCreate();
+      this.onCreate(bundle);
     };
 
     activity.onStart.implementation = function () {
