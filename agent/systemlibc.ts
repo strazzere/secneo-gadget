@@ -11,9 +11,38 @@ export function systemlibcHooks() {
   openHook();
   fopenHook();
   strcmpHook();
+  dlopenHook();
+  dlsymHook();
+  readlinkHook()
+  sleepHook()
+  timeHook()
 
   if (debug) {
     log(` [+] finished hooking generic system/libc methods`);
+  }
+}
+
+function timeHook() {
+  const timePtr = Module.findExportByName(null, 'time');
+  if (timePtr) {
+    log('[*] hooked time : ', timePtr);
+    Interceptor.attach(timePtr, {
+      onEnter: function (_args) {
+        log(`[*] time via ${Stack.getModuleInfo(this.returnAddress)}`);
+      },
+    });
+  }
+}
+
+function sleepHook() {
+  const sleepPtr = Module.findExportByName('libc.so', 'sleep');
+  if (sleepPtr) {
+    log('[*] hooked sleep : ', sleepPtr);
+    Interceptor.attach(sleepPtr, {
+      onEnter: function (_args) {
+        log(`[*] sleep via ${Stack.getModuleInfo(this.returnAddress)}`);
+      },
+    });
   }
 }
 
@@ -63,6 +92,56 @@ function strcmpHook() {
   }
 }
 
+function dlopenHook() {
+  const dlopenPtr = Module.findExportByName(null, 'dlopen');
+  if (dlopenPtr) {
+    log(`[*] hooked dlopen @ ${dlopenPtr}`);
+    Interceptor.attach(dlopenPtr, {
+      onEnter: function (args) {
+        this.libName = args[0].readUtf8String();
+      },
+      onLeave: function (retval) {
+        log(`[*] dlopen(${this.libName}) : ${retval}`);
+      },
+    });
+  }
+}
+
+function dlsymHook() {
+  const dlsymPtr = Module.findExportByName(null, 'dlsym');
+  if (dlsymPtr) {
+    log(`[*] hooked dlsym @ ${dlsymPtr}`);
+    Interceptor.attach(dlsymPtr, {
+      onEnter: function (args) {
+        this.handle = args[0];
+        this.funcName = args[1].readUtf8String();
+      },
+      onLeave: function (retval) {
+        log(`[*] dlsym(${this.handle}, "${this.funcName}") : ${retval}`);
+        // log(` via ${Stack.getModuleInfo(this.returnAddress)}`)
+      },
+    });
+  }
+}
+
+function readlinkHook() {
+  const dlsymPtr = Module.findExportByName(null, 'readlink');
+  if (dlsymPtr) {
+    log(`[*] hooked readlink @ ${dlsymPtr}`);
+    Interceptor.attach(dlsymPtr, {
+      onEnter: function (args) {
+        this.link = args[0].readUtf8String()
+        this.buff = args[1]
+      },
+      onLeave: function (retval) {
+        if (retval > ptr(0)) {
+          log(`[*] readlink("${this.link}") : ${this.buff.readUtf8String()} : ${Stack.getModuleInfo(this.returnAddress)}`);
+        }
+      }
+    });
+  }
+}
+
 // const accessPtr = Module.findExportByName(null, 'access');
 // if (accessPtr) {
 //   log('[*] hooked access : ', accessPtr);
@@ -73,32 +152,6 @@ function strcmpHook() {
 //     onLeave: function (retval) {
 //       log('[+] access :', this.file, 'ret :', retval);
 //       log(Stack.native(this.context));
-//     },
-//   });
-// }
-
-// const dlopenPtr = Module.findExportByName(null, 'dlopen');
-// if (dlopenPtr) {
-//   log('[*] hooked dlopen : ', dlopenPtr);
-//   Interceptor.attach(dlopenPtr, {
-//     onEnter: function (args) {
-//       this.libName = args[0].readUtf8String();
-//     },
-//     onLeave: function (retval) {
-//       log('[*] dlopen :', this.libName, 'ret :', retval);
-//     },
-//   });
-// }
-
-// const dlsymPtr = Module.findExportByName(null, 'dlsym');
-// if (dlsymPtr) {
-//   Interceptor.attach(dlsymPtr, {
-//     onEnter: function (args) {
-//       this.handle = args[0];
-//       this.funcName = args[1].readUtf8String();
-//     },
-//     onLeave: function (retval) {
-//       log('[*] dlsym - handle :', this.handle, 'funcName :', this.funcName, 'ret :', retval);
 //     },
 //   });
 // }
