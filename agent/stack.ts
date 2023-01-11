@@ -91,7 +91,6 @@ export class Stack {
       if (range.file) {
         builtSymbol.path = range.file.path;
         const moduleNameChunks = range.file.path.split('/');
-        console.log(moduleNameChunks[moduleNameChunks.length - 1]);
         builtSymbol.moduleName = moduleNameChunks[moduleNameChunks.length - 1];
 
         builtSymbol.base = range.base.sub(range.file.offset);
