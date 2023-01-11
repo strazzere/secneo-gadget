@@ -27,7 +27,7 @@ export function antiDebug() {
 
 function javaHooks() {
   Java.performNow(() => {
-    javaLoadLibrary()
+    javaLoadLibrary();
     javaSystemExit();
     javaProcessKill();
     javaActivityFinish();
@@ -40,14 +40,14 @@ function javaLoadLibrary() {
   const Runtime = Java.use('java.lang.Runtime');
   const VMStack = Java.use('dalvik.system.VMStack');
 
-  System.loadLibrary.overload('java.lang.String').implementation = function(library: string) {
-      log(` [+] java.lang.System.loadLibrary(${library})`);
-      try {
-          const loaded = Runtime.getRuntime().loadLibrary0(VMStack.getCallingClassLoader(), library);
-          return loaded;
-      } catch(ex) {
-          console.log(ex);
-      }
+  System.loadLibrary.overload('java.lang.String').implementation = function (library: string) {
+    log(` [+] java.lang.System.loadLibrary(${library})`);
+    try {
+      const loaded = Runtime.getRuntime().loadLibrary0(VMStack.getCallingClassLoader(), library);
+      return loaded;
+    } catch (ex) {
+      console.log(ex);
+    }
   };
 }
 

@@ -13,9 +13,9 @@ export function systemlibcHooks() {
   strcmpHook();
   dlopenHook();
   dlsymHook();
-  readlinkHook()
-  sleepHook()
-  timeHook()
+  readlinkHook();
+  sleepHook();
+  timeHook();
 
   if (debug) {
     log(` [+] finished hooking generic system/libc methods`);
@@ -130,14 +130,18 @@ function readlinkHook() {
     log(`[*] hooked readlink @ ${dlsymPtr}`);
     Interceptor.attach(dlsymPtr, {
       onEnter: function (args) {
-        this.link = args[0].readUtf8String()
-        this.buff = args[1]
+        this.link = args[0].readUtf8String();
+        this.buff = args[1];
       },
       onLeave: function (retval) {
         if (retval > ptr(0)) {
-          log(`[*] readlink("${this.link}") : ${this.buff.readUtf8String()} : ${Stack.getModuleInfo(this.returnAddress)}`);
+          log(
+            `[*] readlink("${this.link}") : ${this.buff.readUtf8String()} : ${Stack.getModuleInfo(
+              this.returnAddress,
+            )}`,
+          );
         }
-      }
+      },
     });
   }
 }
