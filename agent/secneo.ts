@@ -1,16 +1,12 @@
 import { log } from './logger';
 import { Stack } from './stack';
 import { writeDexToFile } from './dex';
-import { systemlibcHooks } from './systemlibc';
-import { memoryHooks } from './mem';
 
 const targetLibrary = 'libDexHelper.so';
 
 const stack = new Stack();
 
-const getStack = () => {
-  log(stack.java());
-};
+const debug = false;
 
 let dexBase: NativePointer;
 
@@ -24,17 +20,43 @@ function getDexBase(): NativePointer {
 }
 
 export function secneoJavaHooks() {
-  // Java.perform(function () {
-  //   const aw = Java.use(`com.secneo.apkwrapper.AW`);
-  //   log(`Hooking AW`);
-  //   aw.attachBaseContext.overload('android.content.Context').implementation = function (
-  //     context: Java.Wrapper<object>,
-  //   ) {
-  //     log(` > attachBaseContext called`);
-  //     getStack();
-  //     this.attachBaseContext(context);
-  //   };
-  // });
+  Java.deoptimizeEverything();
+  Java.perform(function () {
+    // Don't load analytics to avoid libmsaoaidsec.so from being loaded, plus who cares about analytics
+    // Lcom/dji/component/application/DJIPrimaryServiceBuilder;->a(Landroid/app/Application;)V;
+    const DJIPrimaryServiceBuilder = Java.use(
+      `com.dji.component.application.DJIPrimaryServiceBuilder`,
+    );
+    DJIPrimaryServiceBuilder.a.overload('android.app.Application').implementation = function (
+      _application: Java.Wrapper<object>,
+    ) {
+      log(` [!] Skipping DJIPrimaryServiceBuilder.a(application)  (skip analytics injection)`);
+    };
+
+    // Skip "STEP_ONE" of StartUpActivity which tries to start the privacy service we want to avoid
+    const startUpActivityOrderEnum = Java.use(
+      `com.dji.component.application.util.DJILaunchUtil$StartUpActivityOrder`,
+    );
+    const DJILaunchUtil = Java.use(`com.dji.component.application.util.DJILaunchUtil`);
+    DJILaunchUtil.handleAppStartUp.overload(
+      `android.content.Context`,
+      `com.dji.component.application.util.DJILaunchUtil$StartUpActivityOrder`,
+    ).implementation = function (
+      context: Java.Wrapper<object>,
+      startUpActivityOrder: Java.Wrapper<object>,
+    ) {
+      if (debug) {
+        log(`startUpActivityOrder was : ${startUpActivityOrder.toString()}`);
+      }
+      // change it to STEP_TWO
+      startUpActivityOrder = startUpActivityOrderEnum.$new().b.value;
+      if (debug) {
+        log(`startUpActivityOrder is : ${startUpActivityOrder.toString()}`);
+      }
+
+      this.handleAppStartUp(context, startUpActivityOrder);
+    };
+  });
 }
 
 export function dumpDexFiles() {
@@ -87,55 +109,22 @@ export function forkerEtc() {
   });
 }
 
-// Experimental, this is the hook for an svc call to __NR_kill (sys kill)
-function sysKillHook() {
-  const sysKillPtr = Module.findExportByName(targetLibrary, 'p8A01F8A04CC4D64E56A88E4D1466B151');
-  // const sysKillPtr = dexBase.add(0xA8E00)
-  if (sysKillPtr) {
-    log(` [+] hooked syskill function p8A01F8A04CC4D64E56A88E4D1466B151`);
-    Interceptor.attach(sysKillPtr, {
-      onEnter: function (_args) {
-        log(` [!] Hit a syskill function! Did not change the value or replace it at all`);
-      },
-    });
-  }
-}
+export function _deobfuscateStrings() {
+  const xorStuff = dexBase.add(0x18220);
+  Interceptor.attach(xorStuff, {
+    onEnter: function (args) {
+      this.stringPtr = args[0];
+    },
+    onLeave: function (_retval) {
+      log(
+        `xorStuff - "${this.returnAddress.sub(
+          dexBase ? dexBase.add(0x4) : 0x4,
+        )}": "${this.stringPtr.readUtf8String()}",`,
+      );
+    },
+  });
 
-// This is the routine that would have called the above sys kill call
-function antiDebugStarter() {
-  const sysKillPtr = Module.findExportByName(targetLibrary, 'pDC54CD4743EC5AAF6F30EA9C1C92801D');
-  // const sysKillPtr = dexBase.add(0xA8E00)
-  if (sysKillPtr) {
-    log(` replacing syskill antidebug thread`);
-    Interceptor.replace(
-      sysKillPtr,
-      new NativeCallback(
-        function () {
-          log(`===> skipping anti debug routine...`);
-          return;
-        },
-        'void',
-        ['void'],
-      ),
-    );
-  }
-}
-
-export function deobfuscateStrings() {
-  // const xorStuff = dexBase.add(0x18220);
-  // Interceptor.attach(xorStuff, {
-  //   onEnter: function (args) {
-  //     this.stringPtr = args[0];
-  //   },
-  //   onLeave: function (_retval) {
-  //     log(
-  //       `xorStuff - "${this.returnAddress.sub(
-  //         dexBase ? dexBase.add(0x4) : 0x4,
-  //       )}": "${this.stringPtr.readUtf8String()}",`,
-  //     );
-  //   },
-  // });
-
+  // These seemingly never get hit if you are on art, likely dalvik specific things
   const unroller = dexBase.add(0x9e26c);
   Interceptor.attach(unroller, {
     onEnter: function (args) {
@@ -156,15 +145,17 @@ export function deobfuscateStrings() {
  * for frida to finish, we may be missing things during this
  * period of time?
  */
-function _antiDebugThreadBlockerReplaceThreadFunctions() {
+function antiDebugThreadBlockerReplaceThreadFunctions() {
   const antiDebugThreadAddresses = [
     0x9ec5c,
     0xaa97c, // Main anti debug thread, looks for status of files and calls a sys_kill
-    0x9d73c,
-    0xe3fd0, // might not be needed to be blocked?
+    0x9d73c, // inotify checks
 
-    0x9d030,
-    0xe3fcc,
+    // These don't appear to be required for the non-anti-debug functionality to work
+    // 0xe3fd0,
+
+    // 0x9d030,
+    // 0xe3fcc,
   ];
 
   antiDebugThreadAddresses.forEach((address, index) => {
@@ -182,7 +173,8 @@ function _antiDebugThreadBlockerReplaceThreadFunctions() {
   });
 }
 
-export function antiDebugStrStr() {
+// This is mitigated by the above things regardless
+export function _antiDebugStrStr() {
   const discountStrStrPtr = dexBase.add(0x9de68);
   Interceptor.attach(discountStrStrPtr, {
     onEnter: function (args) {
@@ -202,7 +194,7 @@ export function antiDebugStrStr() {
   });
 }
 
-function antiDebugMapSeeker() {
+function _antiDebugMapSeeker() {
   // Causes spurious segfaults that can look real, likely is checking to see if there
   // are hooks on the memory in/around libDexHelper.so
   // Crashes represent like the following:
@@ -246,7 +238,8 @@ function antiDebugMapSeeker() {
       _Z33p85949C9CA7704A6EFD2777EB9580B669i,
       new NativeCallback(
         function (int) {
-          log('skipping...');
+          // log('skipping...');
+          // unprotectLibArt()
           return 0;
         },
         'int',
@@ -295,8 +288,12 @@ function antiDebugMapSeeker() {
  * Similar to the above, targets the same threads being created,
  * however it replaces them during the pthread_create call, which
  * seems to "block" the execution better.
+ *
+ * Warning: Utilizing this seems to actually cause the issue where
+ * we get a random segfault, unsure why, utilize the other method
+ * where we just replace the methods all together
  */
-export function antiDebugThreadReplacer() {
+export function _antiDebugThreadReplacer() {
   const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
   log(`Hooking pthread_create : ${pthreadCreate}`);
   Interceptor.attach(pthreadCreate, {
@@ -415,7 +412,7 @@ function hookingEngine() {
       this.funct = args[0].readUtf8String();
     },
     onLeave: function (retval) {
-      log(`_Z19get_libdexfile_funaddrPKc(${this.funct}) : ${retval}`);
+      log(`get_libdexfile_funaddr("${this.funct}") : ${retval}`);
     },
   });
 
@@ -426,26 +423,47 @@ function hookingEngine() {
       this.funct = args[0].readUtf8String();
     },
     onLeave: function (retval) {
-      log(`_Z19get_libart_funaddrPKc_p78C86B081F85A608BB75372604D6C75E(${this.funct}) : ${retval}`);
+      log(`get_libart_funaddr("${this.funct}") : ${retval}`);
     },
   });
 
   // LOAD:0000000000093EDC                 EXPORT hookedFunAddr_read
   const hookedFunctionPtr = dexBase.add(0x0000000000093edc);
   if (hookedFunctionPtr) {
-    log('[*] hookedFunctionPtr : ', hookedFunctionPtr);
+    log('[*] hookFunctionPtr : ', hookedFunctionPtr);
     Interceptor.attach(hookedFunctionPtr, {
       onEnter: function (args) {
-        // args[0] - dlsym address for shared library
-
+        // args[0] - function address to replace
+        // args[1] - function address to replace with
         log(
-          `Hit hookedFunction (${Stack.getModuleInfo(args[0])}, ${Stack.getModuleInfo(args[1])})`,
+          `hookFunction(${Stack.getModuleInfo(args[0])}, ${Stack.getModuleInfo(
+            args[1],
+          )}) : via ${Stack.getModuleInfo(this.returnAddress)}`,
         );
-
-        log(Stack.native(this.context));
+        const functionToReplace = Stack.getModuleInfo(args[0]);
+        if (functionToReplace.includes('linker64')) {
+          Interceptor.attach(args[1], {
+            onEnter: function (args) {
+              log(
+                `*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `,
+              );
+            },
+            onLeave: function (retval) {
+              log(`*************************************** EXITING linkerHook`);
+            },
+          });
+        }
+        // const dexHelperReplacement = Stack.getModuleInfo(args[1])
+        // if (!Stack.getModuleInfo(args[0]).includes('mmap')) {
+        //   Interceptor.attach(args[1], {
+        //     onEnter: function (args) {
+        //       log(`Inside ${dexHelperReplacement} ******************************************** ${Stack.getModuleInfo(this.returnAddress)}`)
+        //     }
+        //   })
+        // }
       },
       onLeave: function (retval) {
-        log(`Hit hookedFunction retval ${retval}`);
+        log(`left`);
       },
     });
   }
@@ -471,8 +489,11 @@ function hookingEngine() {
         const dlHandle = args[0];
         const methodName = args[1].readUtf8String();
         const replacementPtr = args[2];
-        log(` [*] hookMethod(${dlHandle}, ${methodName}, ${Stack.getModuleInfo(replacementPtr)})`);
-        log(Stack.native(this.context));
+        log(
+          ` [*] hookMethod(${dlHandle}, "${methodName}", ${Stack.getModuleInfo(
+            replacementPtr,
+          )}) : via ${Stack.getModuleInfo(this.returnAddress)}`,
+        );
       },
     });
   }
@@ -482,13 +503,95 @@ export function hookDexHelper() {
   if (!dexBase) {
     dexBase = getDexBase();
   }
-  antiDebugMapSeeker();
-  antiDebugStarter();
-  sysKillHook();
-  hookingEngine();
+  antiDebugThreadBlockerReplaceThreadFunctions();
+  // antiDebugMapSeeker();
+  // antiDebugStarter();
+  // sysKillHook();
+  // hookingEngine();
+
   // deobfuscateStrings();
   // systemlibcHooks();
   // antiDebugStrStr();
+
+  // LOAD:0000000000099D60 ; __int64 __fastcall p9D9D5EBFFBA5037CD933AAD42AD3565D(int, int, int, char *)
+  // const something = dexBase.add(0x99D60)
+  // Interceptor.attach(something, {
+  //   onEnter: function (args) {
+  //     log(`*************************************** INSIDE IT`)
+  //   }
+  // })
+
+  // const linkerHook = dexBase.add(0xa6ed4)
+  // Interceptor.attach(linkerHook, {
+  //   onEnter: function (args) {
+  //     log(`*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `)
+  //     const library = args[0].readUtf8String()
+  //     if (library?.includes('libmsaoaidsec.so')) {
+  //       library.replace('libmsaoaidsec', 'libdiffderpec')
+  //       args[0] = Memory.allocUtf8String(library)
+  //     }
+  //   },
+  //   onLeave: function (retval) {
+  //     log(`*************************************** EXITING linkerHook`)
+  //   }
+  // })
+  // Interceptor.replace(
+  //   linkerHook,
+  //   new NativeCallback(
+  //     function () {
+  //       log(`===> skipping linkerHook...`);
+  //       return;
+  //     },
+  //     'void',
+  //     ['void'],
+  //   ),
+  // );
+
+  // LOAD:00000000000A62FC ; __int64 __fastcall p97E60F9036BDF243469376D1271EEF6C(char *haystack)
+  // const antiCheck = dexBase.add(0xA62FC)
+  // Interceptor.attach(antiCheck, {
+  //   onEnter: function (args) {
+  //     log(`**************** anticheck("${args[0].readUtf8String()}")`)
+  //   },
+  //   onLeave: function (retval) {
+  //     log(`retval: ${retval}`)
+  //   }
+  // })
+
+  // const otherCheck = dexBase.add(0x9E7F8)
+  // Interceptor.attach(otherCheck, {
+  //   onEnter: function (args) {
+  //     log(`**************** otherCheck("${args[0]}")`)
+  //   },
+  //   onLeave: function (retval) {
+  //     log(`retval: ${retval}`)
+  //   }
+  // })
+
+  // 00000000000C07F0                 EXPORT p01054F2A1A944FB4581CF7C500BDC587
+  // const checkStrcmp = dexBase.add(0xC07F0)
+  // Interceptor.attach(checkStrcmp, {
+  //   onEnter: function (args) {
+  //     const strcmp = Module.findExportByName(null, 'strcmp');
+  //     if (strcmp) {
+  //       log('[*] hooked strcmp : ', strcmp);
+  //       this.strcmpHook = Interceptor.attach(strcmp, {
+  //         onEnter: function (args) {
+  //           this.s1 = args[0].readUtf8String();
+  //           this.s2 = args[1].readUtf8String();
+  //         },
+  //         onLeave: function (retval) {
+  //           log(`strcmp(${this.s1}, ${this.s2})`);
+  //         },
+  //       });
+  //     }
+  //   }, onLeave: function (retval) {
+  //     if (this.strcmpHook) {
+  //       this.strcmpHook.detach()
+  //     }
+
+  //   }
+  // })
 
   // const potentialAntiDebug = dexBase.add(0x1f3cc);
   // Interceptor.attach(potentialAntiDebug, {
@@ -585,29 +688,37 @@ export function hookDexHelper() {
   //   });
   // }
 
-  const sometype_of_antidebug_hooks = Module.findExportByName(
-    targetLibrary,
-    'p1B20B84FF8C44DD69552223AF70D932F',
-  );
-  if (sometype_of_antidebug_hooks) {
-    Interceptor.replace(
-      sometype_of_antidebug_hooks,
-      new NativeCallback(
-        function () {
-          log(`===> skipping some replacement function thing...`);
-          return new NativeCallback(
-            function () {
-              log(`someone called me?!`);
-            },
-            'void',
-            ['void'],
-          );
-        },
-        'pointer',
-        ['pointer', 'pointer'],
-      ),
-    );
-  }
+  // const sometype_of_antidebug_hooks = Module.findExportByName(
+  //   targetLibrary,
+  //   'p1B20B84FF8C44DD69552223AF70D932F',
+  // );
+  // if (sometype_of_antidebug_hooks) {
+  //   Interceptor.attach(sometype_of_antidebug_hooks, {
+  //     onEnter: function (args) {
+
+  //     },
+  //     onLeave: function (retval) {
+  //       log(`sometype_of_antidebug_hooks : ${retval}`)
+  //     }
+  //   })
+  // Interceptor.replace(
+  //   sometype_of_antidebug_hooks,
+  //   new NativeCallback(
+  //     function () {
+  //       log(`===> skipping some replacement function thing...`);
+  //       return new NativeCallback(
+  //         function () {
+  //           log(`someone called me?!`);
+  //         },
+  //         'void',
+  //         ['void'],
+  //       );
+  //     },
+  //     'pointer',
+  //     ['pointer', 'pointer'],
+  //   ),
+  // );
+  // }
 
   // LOAD:0000000000067810 ; __int64 __fastcall setup_zipres(char *, char *, char *, int)
   // const setupZipRes = Module.findBaseAddress('libDexHelper.so')?.add(0x67810);
