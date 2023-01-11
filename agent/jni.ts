@@ -48,9 +48,9 @@ export function dlopenExtHook(targetLibrary: string, callback?: (context: CpuCon
       onLeave: function (retval) {
         log(` [+] androidDlopenExt("${this.library}", ${this.flags}, &dlextinfo) : ${retval}`);
         if (this.library.includes(targetLibrary)) {
-          hookJniLoad(targetLibrary, callback);
           // We don't need to keep this listener around once it's been hit on what we want
           listener.detach();
+          hookJniLoad(targetLibrary, callback);
         }
       },
     });
