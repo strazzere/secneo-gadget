@@ -1,23 +1,25 @@
+//
+//
+// This is deprecated code, the original approach was using a modified apk that
+// enforced debuggability and then manually forced it to wait for a debugger to
+// attach. However, since then I've been able to just inject into a an unmodified
+// apk.
+//
+// This code is mostly for reference and incase we need to fall back in the future
+// towards this.
+//
+//
 import frida, { Application } from 'frida';
+
 import fs from 'fs';
+import repl from 'repl';
+
+import net from 'net';
 import { exec } from 'child_process';
+// import { MessageType, ErrorMessage } from 'frida/dist/script';
 
+const jdwpPort = 8200;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const agentScript = fs.readFileSync('./build/_agent.js', 'utf8');
-
-const targetIdentifier = 'dji.go.v5';
-
-// type decryptedData = {
-//   address: number;
-//   comment: string;
-// };
-
-// const decrypted: decryptedData[] = [];
-
-// function dumpDecrypted() {
-//   fs.writeFileSync(`comments.json`, JSON.stringify(decrypted));
-// }
 
 export async function runFridaServer() {
   return new Promise((resolve, reject) => {
@@ -33,12 +35,59 @@ export async function runFridaServer() {
           }
           resolve(true);
         });
+        // reject(error);
         return;
       }
       console.log(`Frida is already running, won't start it...`);
       resolve(true);
     });
   });
+}
+
+export async function forwardJdwpPort(pid: number) {
+  return new Promise((resolve, reject) => {
+    exec(`adb forward tcp:${jdwpPort} jdwp:${pid}`, (error, stdout, stderr) => {
+      if (error) {
+        console.log(`error: ${error.message}`);
+        reject(error);
+        return;
+      }
+      if (stderr) {
+        console.log(`stderr: ${stderr}`);
+        return;
+      }
+      console.log(`stdout: ${stdout}`);
+      resolve(true);
+    });
+  });
+}
+
+export async function triggerJdbConnect() {
+  const jdb = net.connect({ host: 'localhost', port: jdwpPort });
+
+  jdb.write(Buffer.from('4a4457502d48616e647368616b65', 'hex'));
+  await delay(100);
+  jdb.write(Buffer.from('0000000b00000001000107', 'hex'));
+  await delay(100);
+  jdb.write(Buffer.from('0000001100000003000f01080000000000', 'hex'));
+  await delay(100);
+  jdb.write(Buffer.from('0000001100000005000f01090000000000', 'hex'));
+  await delay(100);
+}
+
+const agentScript = fs.readFileSync('./build/_agent.js', 'utf8');
+
+const targetIdentifier = 'dji.go.v5';
+
+type decryptedData = {
+  address: number;
+  comment: string;
+};
+
+const decrypted: decryptedData[] = [];
+
+function dumpDecrypted() {
+  fs.writeFileSync(`comments.json`, JSON.stringify(decrypted));
 }
 
 async function launchtarget() {
@@ -85,6 +134,11 @@ async function launchtarget() {
 
   console.log(`loading script`);
   await script.load();
+
+  console.log(`running forwardJdwpPort`);
+  await forwardJdwpPort(pid);
+  console.log(`running triggerJdbConnect`);
+  await triggerJdbConnect();
 }
 
 // this is a dangling promise because it shouldn't return for us
@@ -93,4 +147,6 @@ runFridaServer();
 
 launchtarget().then(() => {
   console.log('Done launching target');
+
+  repl.start('secneo-gadget >').context.dump = dumpDecrypted;
 });
