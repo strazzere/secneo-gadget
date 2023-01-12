@@ -4,23 +4,33 @@ Gadget(s) for debugging, dumping and dissecting secneo protected applications
 
 ## Usage
 
-### How to inject
+In theory, if this is a stable release and all prerequisites are installed, just run;
 
-Rebuild APK and ensure it loads the [frida gadget](https://frida.re/docs/gadget/#:~:text=Frida's%20Gadget%20is%20a%20shared,using%20a%20tool%20like%20insert_dylib), config and script builts from `npm build`.
+```sh
+$ npm start
+```
+
+### Setup
+
+Script expects the correct version (that matches the node dependencies) of `frida` to be pushed to
+`/data/local/tmp/frida-server`. Alternatively, just have the server already running on the device.
+The target application (`dji.go.v5`) should also be installed. Then install all npm dependencies via
+`npm install . -ci`.
 
 ## Agent Only usage
 
 ### How to compile & load for debugging
 
 ```sh
-$ npm install
+$ npm install -ci
 $ npm run build
-$ frida -U -f dji.go.v5 -l build/_agent.js
+$ npm run spawn
 ```
 
 The above works well when just debugging and utilizing the agent, if things are hooked enought to "out run" the anti-debug measures.
 
-### Development workflow
+
+### Continuous building while developing
 
 To continuously recompile on change, keep this running in a terminal:
 
