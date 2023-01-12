@@ -390,6 +390,92 @@ function _unprotectLibArt() {
   }
 }
 
+// https://cs.android.com/android/platform/superproject/+/master:art/libdexfile/dex/standard_dex_file.h;l=54?q=CodeItem&ss=android%2Fplatform%2Fsuperproject
+// uint16_t registers_size_;            // the number of registers used by this code
+// //   (locals + parameters)
+// uint16_t ins_size_;                  // the number of words of incoming arguments to the method
+// //   that this code is for
+// uint16_t outs_size_;                 // the number of words of outgoing argument space required
+// //   by this code for method invocation
+// uint16_t tries_size_;                // the number of try_items for this instance. If non-zero,
+// //   then these appear as the tries array just after the
+// //   insns in this instance.
+// uint32_t debug_info_off_;            // Holds file offset to debug info stream.
+
+// uint32_t insns_size_in_code_units_;  // size of the insns array, in 2 byte code units
+// uint16_t insns_[1];                  // actual array of bytecode.
+function readCodeItem(codeitem: NativePointer) {
+  log(`registers size ${codeitem.readU16()}`);
+  log(`ins_size ${codeitem.add(2).readU16()}`);
+  log(`outs_size ${codeitem.add(4).readU16()}`);
+  log(`tries_size_ ${codeitem.add(6).readU16()}`);
+  log(`debug_info_off_ ${codeitem.add(8).readU32()}`);
+  const codeUnits = codeitem.add(12).readU32();
+  log(`insns_size_in_code_units_ ${codeUnits}`);
+  const instructions = codeitem.add(16).readByteArray(codeUnits * 2);
+  if (instructions !== null) {
+    const instructionsArray = new Uint8Array(instructions);
+
+    log(`insns : ${Buffer.from(instructionsArray).toString('hex')}`);
+  }
+
+  log(
+    hexdump(codeitem, {
+      offset: 0,
+      length: 2 + 2 + 2 + 2 + 4 + 4 + codeUnits * 2,
+      header: true,
+      ansi: true,
+    }),
+  );
+}
+
+// https://cs.android.com/android/platform/superproject/+/master:art/runtime/instrumentation.cc;drc=61d06bbec93e335119066679a8b2ed138883ab0c;l=354
+function hookedArt() {
+  // this would be nice to get working, but unsure what is broken with it
+  // const prettyMethodPtr = Module.getExportByName(
+  //   'libart.so',
+  //   '_ZN3art9ArtMethod12PrettyMethodEPS0_b',
+  // );
+  // if (prettyMethodPtr) {
+  //   log(`got art::ArtMethod::PrettyMethod(art::ArtMethod*, bool) @ ${prettyMethodPtr}`);
+  // }
+  // const prettyMethod = new NativeFunction(prettyMethodPtr, 'pointer', ['pointer', 'bool']);
+  // const prettyMethodPtr = Module.getExportByName('libart.so', '_ZN3art9ArtMethod12PrettyMethodEb');
+  // const prettyMethod = new NativeFunction(prettyMethodPtr, 'pointer', [
+  //   'pointer',
+  //   'pointer',
+  //   'bool',
+  // ]);
+
+  const getCodeItemPtr = Module.getExportByName('libart.so', 'NterpGetCodeItem');
+  const getCodeItem = new NativeFunction(getCodeItemPtr, 'pointer', ['pointer']);
+
+  // LOAD:0000000000048DA4 hooked_ZN3art15instrumentation15Instrumentation21InitializeMethodsCode_ZN3art15instrumentation15Instrumentation21InitializeMethodsCodeEPNS_9ArtMethodEPKv
+  // LOAD:0000000000048DA4 ; DATA XREF: hook_art_initialize_methods_function+199C↓o
+  // LOAD:0000000000048DA4 ; hook_art_initialize_methods_function+19A4↓o ...
+  //
+  // void Instrumentation::InitializeMethodsCode(ArtMethod* method, const void* aot_code)
+  const initializeMethodsCode = dexBase.add(0x48da4);
+  Interceptor.attach(initializeMethodsCode, {
+    onEnter: function (args) {
+      // args[0] InitializeMethodsCode itself?
+      // args[1] artmethod
+      // args[2] aot_code
+      log(` [+] initializeMethodsCode(${args[0]}, ${args[1]}, ${args[2]}) `);
+      this.curArtMethod = args[1];
+
+      // Encrypted (or was never encrypted if it is there)
+      const result = getCodeItem(this.curArtMethod);
+      log(readCodeItem(result));
+    },
+    onLeave: function (_retval) {
+      // Decrypted at this point
+      const result = getCodeItem(this.curArtMethod);
+      log(readCodeItem(result));
+    },
+  });
+}
+
 function hookingEngine() {
   const get_libart_funaddrP = Module.findExportByName(
     targetLibrary,
@@ -504,6 +590,7 @@ export function hookDexHelper() {
     dexBase = getDexBase();
   }
   antiDebugThreadBlockerReplaceThreadFunctions();
+  hookedArt();
   // antiDebugMapSeeker();
   // antiDebugStarter();
   // sysKillHook();
