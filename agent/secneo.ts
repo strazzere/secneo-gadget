@@ -3,11 +3,7 @@ import { Stack } from './stack';
 import { writeDexToFile } from './dex';
 
 const targetLibrary = 'libDexHelper.so';
-
-const stack = new Stack();
-
 const debug = false;
-
 let dexBase: NativePointer;
 
 function getDexBase(): NativePointer {
@@ -103,7 +99,7 @@ export function dumpDexFiles() {
 export function forkerEtc() {
   const forkerPtr = dexBase.add(0x9e40c);
   Interceptor.attach(forkerPtr, {
-    onEnter: function (args) {
+    onEnter: function (_args) {
       log(`[*] fork was hit`);
     },
   });
@@ -237,7 +233,7 @@ function _antiDebugMapSeeker() {
     Interceptor.replace(
       _Z33p85949C9CA7704A6EFD2777EB9580B669i,
       new NativeCallback(
-        function (int) {
+        function (_int) {
           // log('skipping...');
           // unprotectLibArt()
           return 0;
@@ -476,7 +472,7 @@ function hookedArt() {
   });
 }
 
-function hookingEngine() {
+function _hookingEngine() {
   const get_libart_funaddrP = Module.findExportByName(
     targetLibrary,
     'p78C86B081F85A608BB75372604D6C75E',
@@ -534,7 +530,7 @@ function hookingEngine() {
                 `*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `,
               );
             },
-            onLeave: function (retval) {
+            onLeave: function (_retval) {
               log(`*************************************** EXITING linkerHook`);
             },
           });
@@ -548,7 +544,7 @@ function hookingEngine() {
         //   })
         // }
       },
-      onLeave: function (retval) {
+      onLeave: function (_retval) {
         log(`left`);
       },
     });
