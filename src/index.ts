@@ -1,6 +1,9 @@
 import frida, { Application } from 'frida';
 import fs from 'fs';
 import { exec } from 'child_process';
+import repl from 'repl';
+import { V4MAPPED } from 'dns';
+import { Script } from 'frida/dist/script';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -41,7 +44,18 @@ export async function runFridaServer() {
   });
 }
 
-async function launchtarget() {
+let script: Script | null;
+
+function stop() {
+  if (script !== null) {
+    script.unload();
+    script = null;
+  }
+}
+
+async function main() {
+  process.on('SIGTERM', stop);
+  process.on('SIGINT', stop);
   await delay(1000);
   const device = await frida.getUsbDevice();
 
@@ -59,38 +73,43 @@ async function launchtarget() {
   const target = matchingTargets.at(0);
 
   let pid = target?.pid;
-
-  if (!pid || pid <= 0) {
-    pid = await device.spawn(targetIdentifier);
+  if (pid) {
+    console.log(`Found pid already running, killing it`);
+    await device.kill(pid);
   }
+
+  console.log('Launching target application, then attaching.');
+  pid = await device.spawn(targetIdentifier);
 
   console.log(`running device.attach`);
   const session = await device.attach(pid);
+
+  session.detached.connect((reason) => {
+    console.log(` > detached : ${reason}`);
+  });
+
   console.log(`creating script`);
-  const script = await session.createScript(agentScript);
+  script = await session.createScript(agentScript);
   script.message.connect((message) => {
-    // switch (message.type) {
-    // case MessageType.Send:
-    //   if (message?.payload?.type === 'decrypt') {
-    //     decrypted.push(message?.payload?.decrypted);
-    //   }
-    //   break;
-    // case MessageType.Error:
-    //   console.log(`Error received from script: ${(message as ErrorMessage).stack}`);
-    //   break;
-    // default:
-    console.log(`Unknown message type received : ${message}`);
-    // }
+    console.log(`Unknown message type received : ${JSON.stringify(message)}`);
+    console.log(message);
   });
 
   console.log(`loading script`);
   await script.load();
+  await session.resume();
+
+  const replServer = repl.start('secneo-gadget > ');
+  replServer.context.device = device;
+  replServer.context.script = script;
+  replServer.context.session = session;
+  replServer.context.target = target;
 }
 
 // this is a dangling promise because it shouldn't return for us
-console.log('Running frida-server');
+console.log('Running frida-server if needed');
 runFridaServer();
 
-launchtarget().then(() => {
-  console.log('Done launching target');
+main().catch((e) => {
+  console.log(e);
 });
