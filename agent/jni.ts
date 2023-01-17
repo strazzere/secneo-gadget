@@ -37,27 +37,28 @@ function parseFlags(flags: number) {
 // the shared library is loaded, so we can hook any (non-packed) functions
 // such as JNI_onLoad
 // https://cs.android.com/android/platform/superproject/+/master:external/cronet/base/android/linker/modern_linker_jni.cc;l=147-179
-export function dlopenExtHook(targetLibrary: string, callback?: (context: CpuContext) => void) {
+export function dlopenExtHook(targetLibrary: string, enterCallback?: (context: CpuContext) => void, leaveCallback?: (context: CpuContext) => void) {
   const androidDlopenExtPtr = Module.findExportByName(null, 'android_dlopen_ext');
-  if (androidDlopenExtPtr) {
-    const listener = Interceptor.attach(androidDlopenExtPtr, {
-      onEnter: function (args) {
-        this.library = args[0].readUtf8String();
-        this.flags = parseFlags(args[1].toInt32());
-      },
-      onLeave: function (retval) {
-        log(` [+] androidDlopenExt("${this.library}", ${this.flags}, &dlextinfo) : ${retval}`);
-        if (this.library.includes(targetLibrary)) {
-          // We don't need to keep this listener around once it's been hit on what we want
-          listener.detach();
-          hookJniLoad(targetLibrary, callback);
-        }
-      },
-    });
+  if (!androidDlopenExtPtr) {
+    throw new Error(`Unable to find export for android_dlopen_ext`);
   }
+  const listener = Interceptor.attach(androidDlopenExtPtr, {
+    onEnter: function (args) {
+      this.library = args[0].readUtf8String();
+      this.flags = parseFlags(args[1].toInt32());
+    },
+    onLeave: function (retval) {
+      log(` [+] androidDlopenExt("${this.library}", ${this.flags}, &dlextinfo) : ${retval}`);
+      if (this.library.includes(targetLibrary)) {
+        // We don't need to keep this listener around once it's been hit on what we want
+        listener.detach();
+        hookJniLoad(targetLibrary, enterCallback, leaveCallback);
+      }
+    },
+  });
 }
 
-function hookJniLoad(targetLibrary: string, callback?: (context: CpuContext) => void): void {
+function hookJniLoad(targetLibrary: string, enterCallback?: (context: CpuContext) => void, leaveCallback?: (context: CpuContext) => void): void {
   const jniLoadPtr = Module.findExportByName(targetLibrary, 'JNI_OnLoad');
   if (!jniLoadPtr) {
     throw new Error(`No address was found for JNI_OnLoad for ${targetLibrary}`);
@@ -68,11 +69,14 @@ function hookJniLoad(targetLibrary: string, callback?: (context: CpuContext) => 
 
   const listener = Interceptor.attach(jniLoadPtr, {
     onEnter: function (_args) {
-      callback?.(this.context);
+      enterCallback?.(this.context);
       // We likely could detach this, as a jni onload should not be fired more than once unless
       // some weirdness is going on?
       listener.detach();
     },
+    onLeave: function (_retval) {
+      leaveCallback?.(this.context)
+    }
   });
 }
 
@@ -84,13 +88,14 @@ export function loadNativeLib(targetLibrary: string, callback?: (context: CpuCon
     'libart.so',
     '_ZN3art9JavaVMExt17LoadNativeLibraryEP7_JNIEnvRKNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEP8_jobjectP7_jclassPS9_',
   );
-  if (loadNativeLibPtr) {
-    Interceptor.attach(loadNativeLibPtr, {
-      onEnter: function (_args) {
-        // args[1] is a std::string which contains the library, but this is a bit
-        // of an annoyance to parse correctly
-        hookJniLoad(targetLibrary, callback);
-      },
-    });
+  if (!loadNativeLibPtr) {
+    throw new Error(`No address was found for LoadNativeLibrary for libart.so`);
   }
+  Interceptor.attach(loadNativeLibPtr, {
+    onEnter: function (_args) {
+      // args[1] is a std::string which contains the library, but this is a bit
+      // of an annoyance to parse correctly
+      hookJniLoad(targetLibrary, callback);
+    },
+  });
 }

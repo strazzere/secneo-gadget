@@ -3,6 +3,8 @@ import { Stack } from './stack';
 import { hookDexHelper, secneoJavaHooks } from './secneo';
 import { dlopenExtHook } from './jni';
 import { hookCallFunction } from './linker';
+import { antiDebug } from './anti'
+import { JNI } from './art'
 
 // Oddly this is a string
 const targetedAndroidVersion = '13';
@@ -10,6 +12,8 @@ if (Java.androidVersion !== targetedAndroidVersion) {
   log(
     `Unexpected Android version, this script may not work as expected, targeting ${targetedAndroidVersion} but found ${Java.androidVersion}`,
   );
+} else {
+  log(`Android version ${Java.androidVersion}`);
 }
 
 log(`Attempting to work inside pid ${Process.id}`);
@@ -28,6 +32,7 @@ hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
           new NativeCallback(
             function () {
               log(` [*] Skipping OPENSSL_cpuid_setup`);
+              Thread.sleep(1)
             },
             'void',
             ['void'],
@@ -44,8 +49,19 @@ hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
 let hooked = false;
 if (!hooked) {
   dlopenExtHook('libDexHelper.so', function (_context) {
+    send({
+      event: 'dlopenExtHook',
+      detail: 'Hit hook, attempting to set hooks inside lib',
+    });
     hooked = true;
     hookDexHelper();
+    // We don't actually need this for the purposes of doing any of the antidebug work
+    // we just need to "slow down" execution for frida to catch the java hooks we want
+    // which follow it
+    antiDebug()
+    secneoJavaHooks();
+  }, function (_context) {
+    // This appears to be too late to call the hook
     secneoJavaHooks();
   });
 }
@@ -58,4 +74,9 @@ Process.setExceptionHandler(function (d) {
   return false;
 });
 
-log(`${hooked ? '(Re)l' : 'l'}oaded`);
+log(`Script ${hooked ? '(Re)l' : 'l'}oaded`);
+
+send({
+  event: 'loaded',
+  detail: 'Initialized index loaded fully',
+});

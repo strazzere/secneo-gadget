@@ -1,6 +1,7 @@
 import { log } from './logger';
 import { Stack } from './stack';
 import { writeDexToFile } from './dex';
+import { JNI } from './art';
 
 const targetLibrary = 'libDexHelper.so';
 const debug = false;
@@ -16,8 +17,9 @@ function getDexBase(): NativePointer {
 }
 
 export function secneoJavaHooks() {
-  Java.deoptimizeEverything();
+  // Java.deoptimizeEverything();
   Java.perform(function () {
+    log(` [*] Removing analytics and privacy services via java hooks`)
     // Don't load analytics to avoid libmsaoaidsec.so from being loaded, plus who cares about analytics
     // Lcom/dji/component/application/DJIPrimaryServiceBuilder;->a(Landroid/app/Application;)V;
     const DJIPrimaryServiceBuilder = Java.use(
@@ -52,6 +54,15 @@ export function secneoJavaHooks() {
 
       this.handleAppStartUp(context, startUpActivityOrder);
     };
+
+    // Likely we can just return false here? com.dji.activate.ActivateUtils.b(SourceFile:2)
+    const ActivateTools = Java.use(`com.dji.activate.ActivateUtils`)
+    ActivateTools.b.overload().implementation = function() {
+      // if (debug) {
+        log(`ActivateTools is returning false`);
+      // }
+      return false
+    }
   });
 }
 
@@ -148,9 +159,9 @@ function antiDebugThreadBlockerReplaceThreadFunctions() {
     0x9d73c, // inotify checks
 
     // These don't appear to be required for the non-anti-debug functionality to work
-    // 0xe3fd0,
+    0xe3fd0,
 
-    // 0x9d030,
+    0x9d030,
     // 0xe3fcc,
   ];
 
@@ -400,15 +411,39 @@ function _unprotectLibArt() {
 
 // uint32_t insns_size_in_code_units_;  // size of the insns array, in 2 byte code units
 // uint16_t insns_[1];                  // actual array of bytecode.
-function readCodeItem(codeitem: NativePointer) {
-  log(`registers size ${codeitem.readU16()}`);
-  log(`ins_size ${codeitem.add(2).readU16()}`);
-  log(`outs_size ${codeitem.add(4).readU16()}`);
-  log(`tries_size_ ${codeitem.add(6).readU16()}`);
-  log(`debug_info_off_ ${codeitem.add(8).readU32()}`);
-  const codeUnits = codeitem.add(12).readU32();
+function readCodeItem(codeItem: NativePointer) {
+  const registers_size = codeItem.readU16();
+  const ins_size = codeItem.add(2).readU16();
+  const outs_size = codeItem.add(4).readU16();
+  const tries_size = codeItem.add(6).readU16();
+  // There appears to be a few large instances that go across map boundries and causes an access
+  // violation?
+  const insns_size_in_code_units = codeItem.add(12).readU32();
+  let insns: ArrayBuffer | null =  null
+  if (insns_size_in_code_units < 85000) {
+    insns = codeItem.add(16).readByteArray(insns_size_in_code_units * 2);
+
+  }
+
+  return {
+    registers_size,
+    ins_size,
+    outs_size,
+    tries_size,
+    insns_size_in_code_units,
+    insns: insns,
+  };
+}
+
+function printCodeItem(codeItem: NativePointer) {
+  log(`registers size ${codeItem.readU16()}`);
+  log(`ins_size ${codeItem.add(2).readU16()}`);
+  log(`outs_size ${codeItem.add(4).readU16()}`);
+  log(`tries_size_ ${codeItem.add(6).readU16()}`);
+  log(`debug_info_off_ ${codeItem.add(8).readU32()}`);
+  const codeUnits = codeItem.add(12).readU32();
   log(`insns_size_in_code_units_ ${codeUnits}`);
-  const instructions = codeitem.add(16).readByteArray(codeUnits * 2);
+  const instructions = codeItem.add(16).readByteArray(codeUnits * 2);
   if (instructions !== null) {
     const instructionsArray = new Uint8Array(instructions);
 
@@ -416,13 +451,20 @@ function readCodeItem(codeitem: NativePointer) {
   }
 
   log(
-    hexdump(codeitem, {
+    hexdump(codeItem, {
       offset: 0,
       length: 2 + 2 + 2 + 2 + 4 + 4 + codeUnits * 2,
       header: true,
       ansi: true,
     }),
   );
+}
+
+function dumpCodeItem(codeItem: NativePointer) {
+  const data = codeItem.readByteArray(16 + (codeItem.add(12).readU32() * 2))
+  if (data) {
+    log(`"data" : "${Buffer.from(new Uint8Array(data)).toString('hex')}",`)
+  }
 }
 
 // https://cs.android.com/android/platform/superproject/+/master:art/runtime/instrumentation.cc;drc=61d06bbec93e335119066679a8b2ed138883ab0c;l=354
@@ -457,19 +499,76 @@ function hookedArt() {
       // args[0] InitializeMethodsCode itself?
       // args[1] artmethod
       // args[2] aot_code
-      log(` [+] initializeMethodsCode(${args[0]}, ${args[1]}, ${args[2]}) `);
       this.curArtMethod = args[1];
 
       // Encrypted (or was never encrypted if it is there)
-      const result = getCodeItem(this.curArtMethod);
-      log(readCodeItem(result));
+      const codeItem = getCodeItem(this.curArtMethod);
+      if (codeItem.compare(0) !== 0) {
+        // try {
+          const data = readCodeItem(codeItem);
+          if (data.insns && data.insns.byteLength > 4) {
+            const test = data.insns.unwrap();
+            // 00 00 14 00 : const v0, KEY
+            if (test.readS32() === 1310720) {
+              this.stolenByteCodes = true;
+              if (debug) {
+                log(` [+] initializeMethodsCode(${args[0]}, ${args[1]}, ${args[2]}) `);
+                if (codeItem) {
+                  log(printCodeItem(codeItem));
+                }
+              }
+            }
+          }
+        // } catch (error) {
+        //   log(error)
+        //   log(this.curArtMethod)
+        //   log(codeItem)
+        // }
+      }
     },
     onLeave: function (_retval) {
       // Decrypted at this point
-      const result = getCodeItem(this.curArtMethod);
-      log(readCodeItem(result));
+      if (this.stolenByteCodes) {
+        const codeItem = getCodeItem(this.curArtMethod);
+        const data = readCodeItem(codeItem);
+        dumpCodeItem(codeItem)
+        // send(
+        //   {
+        //     registers_size: data.registers_size,
+        //     ins_size: data.ins_size,
+        //     outs_size: data.outs_size,
+        //     tries_size: data.tries_size,
+        //     insns_size_in_code_units: data.ins_size,
+        //   },
+        //   data.insns,
+        // );
+        if (debug) {
+          log(printCodeItem(codeItem));
+          log(`<=======`);
+        }
+      }
     },
   });
+}
+
+function linkerHooks() {
+  const linkerHook = dexBase.add(0xa6ed4)
+  Interceptor.attach(linkerHook, {
+    onEnter: function (args) {
+      log(`*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `)
+      const library = args[0].readUtf8String()
+      // if (library?.includes('libc++_shared.so')) {
+      //   secneoJavaHooks()
+      // }
+      // if (library?.includes('libmsaoaidsec.so')) {
+      //   library.replace('libmsaoaidsec', 'libdiffderpec')
+      //   args[0] = Memory.allocUtf8String(library)
+      // }
+    },
+    onLeave: function (retval) {
+      log(`*************************************** EXITING linkerHook`)
+    }
+  })
 }
 
 function _hookingEngine() {
@@ -586,6 +685,7 @@ export function hookDexHelper() {
     dexBase = getDexBase();
   }
   antiDebugThreadBlockerReplaceThreadFunctions();
+  // _deobfuscateStrings()
   hookedArt();
   // antiDebugMapSeeker();
   // antiDebugStarter();
@@ -604,20 +704,6 @@ export function hookDexHelper() {
   //   }
   // })
 
-  // const linkerHook = dexBase.add(0xa6ed4)
-  // Interceptor.attach(linkerHook, {
-  //   onEnter: function (args) {
-  //     log(`*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `)
-  //     const library = args[0].readUtf8String()
-  //     if (library?.includes('libmsaoaidsec.so')) {
-  //       library.replace('libmsaoaidsec', 'libdiffderpec')
-  //       args[0] = Memory.allocUtf8String(library)
-  //     }
-  //   },
-  //   onLeave: function (retval) {
-  //     log(`*************************************** EXITING linkerHook`)
-  //   }
-  // })
   // Interceptor.replace(
   //   linkerHook,
   //   new NativeCallback(
