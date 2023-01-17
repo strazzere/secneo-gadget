@@ -11,7 +11,7 @@ const getStack = () => {
 export function antiDebug() {
   javaHooks();
   connectHook();
-  unlinkHook();
+  // unlinkHook();
   exitHook();
   forkHook();
   ptraceHook();
