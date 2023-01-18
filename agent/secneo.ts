@@ -19,7 +19,7 @@ function getDexBase(): NativePointer {
 export function secneoJavaHooks() {
   // Java.deoptimizeEverything();
   Java.perform(function () {
-    log(` [*] Removing analytics and privacy services via java hooks`)
+    log(` [*] Removing analytics and privacy services via java hooks`);
     // Don't load analytics to avoid libmsaoaidsec.so from being loaded, plus who cares about analytics
     // Lcom/dji/component/application/DJIPrimaryServiceBuilder;->a(Landroid/app/Application;)V;
     const DJIPrimaryServiceBuilder = Java.use(
@@ -56,13 +56,13 @@ export function secneoJavaHooks() {
     };
 
     // Likely we can just return false here? com.dji.activate.ActivateUtils.b(SourceFile:2)
-    const ActivateTools = Java.use(`com.dji.activate.ActivateUtils`)
-    ActivateTools.b.overload().implementation = function() {
+    const ActivateTools = Java.use(`com.dji.activate.ActivateUtils`);
+    ActivateTools.b.overload().implementation = function () {
       // if (debug) {
-        log(`ActivateTools is returning false`);
+      log(`ActivateTools is returning false`);
       // }
-      return false
-    }
+      return false;
+    };
   });
 }
 
@@ -419,10 +419,9 @@ function readCodeItem(codeItem: NativePointer) {
   // There appears to be a few large instances that go across map boundries and causes an access
   // violation?
   const insns_size_in_code_units = codeItem.add(12).readU32();
-  let insns: ArrayBuffer | null =  null
+  let insns: ArrayBuffer | null = null;
   if (insns_size_in_code_units < 85000) {
     insns = codeItem.add(16).readByteArray(insns_size_in_code_units * 2);
-
   }
 
   return {
@@ -461,9 +460,9 @@ function printCodeItem(codeItem: NativePointer) {
 }
 
 function dumpCodeItem(codeItem: NativePointer) {
-  const data = codeItem.readByteArray(16 + (codeItem.add(12).readU32() * 2))
+  const data = codeItem.readByteArray(16 + codeItem.add(12).readU32() * 2);
   if (data) {
-    log(`"data" : "${Buffer.from(new Uint8Array(data)).toString('hex')}",`)
+    log(`"data" : "${Buffer.from(new Uint8Array(data)).toString('hex')}",`);
   }
 }
 
@@ -505,20 +504,20 @@ function hookedArt() {
       const codeItem = getCodeItem(this.curArtMethod);
       if (codeItem.compare(0) !== 0) {
         // try {
-          const data = readCodeItem(codeItem);
-          if (data.insns && data.insns.byteLength > 4) {
-            const test = data.insns.unwrap();
-            // 00 00 14 00 : const v0, KEY
-            if (test.readS32() === 1310720) {
-              this.stolenByteCodes = true;
-              if (debug) {
-                log(` [+] initializeMethodsCode(${args[0]}, ${args[1]}, ${args[2]}) `);
-                if (codeItem) {
-                  log(printCodeItem(codeItem));
-                }
+        const data = readCodeItem(codeItem);
+        if (data.insns && data.insns.byteLength > 4) {
+          const test = data.insns.unwrap();
+          // 00 00 14 00 : const v0, KEY
+          if (test.readS32() === 1310720) {
+            this.stolenByteCodes = true;
+            if (debug) {
+              log(` [+] initializeMethodsCode(${args[0]}, ${args[1]}, ${args[2]}) `);
+              if (codeItem) {
+                log(printCodeItem(codeItem));
               }
             }
           }
+        }
         // } catch (error) {
         //   log(error)
         //   log(this.curArtMethod)
@@ -531,7 +530,7 @@ function hookedArt() {
       if (this.stolenByteCodes) {
         const codeItem = getCodeItem(this.curArtMethod);
         const data = readCodeItem(codeItem);
-        dumpCodeItem(codeItem)
+        dumpCodeItem(codeItem);
         // send(
         //   {
         //     registers_size: data.registers_size,
@@ -552,11 +551,11 @@ function hookedArt() {
 }
 
 function linkerHooks() {
-  const linkerHook = dexBase.add(0xa6ed4)
+  const linkerHook = dexBase.add(0xa6ed4);
   Interceptor.attach(linkerHook, {
     onEnter: function (args) {
-      log(`*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `)
-      const library = args[0].readUtf8String()
+      log(`*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `);
+      const library = args[0].readUtf8String();
       // if (library?.includes('libc++_shared.so')) {
       //   secneoJavaHooks()
       // }
@@ -566,9 +565,9 @@ function linkerHooks() {
       // }
     },
     onLeave: function (retval) {
-      log(`*************************************** EXITING linkerHook`)
-    }
-  })
+      log(`*************************************** EXITING linkerHook`);
+    },
+  });
 }
 
 function _hookingEngine() {

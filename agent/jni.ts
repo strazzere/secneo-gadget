@@ -37,7 +37,11 @@ function parseFlags(flags: number) {
 // the shared library is loaded, so we can hook any (non-packed) functions
 // such as JNI_onLoad
 // https://cs.android.com/android/platform/superproject/+/master:external/cronet/base/android/linker/modern_linker_jni.cc;l=147-179
-export function dlopenExtHook(targetLibrary: string, enterCallback?: (context: CpuContext) => void, leaveCallback?: (context: CpuContext) => void) {
+export function dlopenExtHook(
+  targetLibrary: string,
+  enterCallback?: (context: CpuContext) => void,
+  leaveCallback?: (context: CpuContext) => void,
+) {
   const androidDlopenExtPtr = Module.findExportByName(null, 'android_dlopen_ext');
   if (!androidDlopenExtPtr) {
     throw new Error(`Unable to find export for android_dlopen_ext`);
@@ -58,7 +62,11 @@ export function dlopenExtHook(targetLibrary: string, enterCallback?: (context: C
   });
 }
 
-function hookJniLoad(targetLibrary: string, enterCallback?: (context: CpuContext) => void, leaveCallback?: (context: CpuContext) => void): void {
+function hookJniLoad(
+  targetLibrary: string,
+  enterCallback?: (context: CpuContext) => void,
+  leaveCallback?: (context: CpuContext) => void,
+): void {
   const jniLoadPtr = Module.findExportByName(targetLibrary, 'JNI_OnLoad');
   if (!jniLoadPtr) {
     throw new Error(`No address was found for JNI_OnLoad for ${targetLibrary}`);
@@ -75,8 +83,8 @@ function hookJniLoad(targetLibrary: string, enterCallback?: (context: CpuContext
       listener.detach();
     },
     onLeave: function (_retval) {
-      leaveCallback?.(this.context)
-    }
+      leaveCallback?.(this.context);
+    },
   });
 }
 

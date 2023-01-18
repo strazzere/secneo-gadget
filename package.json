@@ -16,9 +16,11 @@
     "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
     "lint": "npx eslint research/jdwp/*.ts src/*.ts agent/*.ts",
     "start": "npm run prepare && node build/index.js",
-    "spawn": "frida -U -f dji.go.v5 -l build/_agent.js"
+    "spawn": "frida -U -f dji.go.v5 -l build/_agent.js",
+    "combine": "tsc && node build/combine.js"
   },
   "devDependencies": {
+    "@types/cli-progress": "^3.11.0",
     "@types/frida-gum": "^17.1.0",
     "@types/node": "^16.4.8",
     "@typescript-eslint/eslint-plugin": "^5.30.6",
@@ -29,6 +31,7 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "cli-progress": "^3.11.2",
     "frida": "^16.0.8"
   }
 }

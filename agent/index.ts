@@ -3,8 +3,8 @@ import { Stack } from './stack';
 import { hookDexHelper, secneoJavaHooks } from './secneo';
 import { dlopenExtHook } from './jni';
 import { hookCallFunction } from './linker';
-import { antiDebug } from './anti'
-import { JNI } from './art'
+import { antiDebug } from './anti';
+import { JNI } from './art';
 
 // Oddly this is a string
 const targetedAndroidVersion = '13';
@@ -32,7 +32,7 @@ hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
           new NativeCallback(
             function () {
               log(` [*] Skipping OPENSSL_cpuid_setup`);
-              Thread.sleep(1)
+              Thread.sleep(1);
             },
             'void',
             ['void'],
@@ -48,22 +48,26 @@ hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
 
 let hooked = false;
 if (!hooked) {
-  dlopenExtHook('libDexHelper.so', function (_context) {
-    send({
-      event: 'dlopenExtHook',
-      detail: 'Hit hook, attempting to set hooks inside lib',
-    });
-    hooked = true;
-    hookDexHelper();
-    // We don't actually need this for the purposes of doing any of the antidebug work
-    // we just need to "slow down" execution for frida to catch the java hooks we want
-    // which follow it
-    antiDebug()
-    secneoJavaHooks();
-  }, function (_context) {
-    // This appears to be too late to call the hook
-    secneoJavaHooks();
-  });
+  dlopenExtHook(
+    'libDexHelper.so',
+    function (_context) {
+      send({
+        event: 'dlopenExtHook',
+        detail: 'Hit hook, attempting to set hooks inside lib',
+      });
+      hooked = true;
+      hookDexHelper();
+      // We don't actually need this for the purposes of doing any of the antidebug work
+      // we just need to "slow down" execution for frida to catch the java hooks we want
+      // which follow it
+      antiDebug();
+      secneoJavaHooks();
+    },
+    function (_context) {
+      // This appears to be too late to call the hook
+      secneoJavaHooks();
+    },
+  );
 }
 
 Process.setExceptionHandler(function (d) {
