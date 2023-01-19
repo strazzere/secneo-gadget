@@ -6,6 +6,7 @@ import { JNI } from './art';
 const targetLibrary = 'libDexHelper.so';
 const debug = false;
 let dexBase: NativePointer;
+let cLoader: Java.Wrapper<object>;
 
 function getDexBase(): NativePointer {
   const base = Module.findBaseAddress(targetLibrary);
@@ -64,6 +65,63 @@ export function secneoJavaHooks() {
       return false;
     };
   });
+}
+
+export function forceLoadClasses() {
+  Java.performNow(() => {
+    const dexclassLoader = Java.use('dalvik.system.DexClassLoader');
+    dexclassLoader.loadClass.overload('java.lang.String').implementation = function (name) {
+      var result = this.loadClass(name, false);
+      if (!cLoader) {
+        cLoader = this;
+        log('  [+] Classloader found, attempting to load classes now!');
+        // Load these now incase the class loader object for some reason dies -- which does happen (removed likely)
+        loadClasses(cLoader);
+      }
+
+      return result;
+    };
+  });
+}
+
+function loadClasses(classLoader: Java.Wrapper<object>) {
+  let loaded = 0;
+  let errorLoading = 0;
+
+  Java.performNow(function () {
+    if (classLoader != null) {
+      let classesToLoad = Java.enumerateLoadedClassesSync();
+      let neededClasses = getNeededClasses();
+      if (neededClasses != null && neededClasses.length > 0) {
+        classesToLoad.concat(neededClasses);
+      }
+
+      log(`  [+] Attempting to force load ${classesToLoad.length} classes`);
+      classesToLoad.forEach((clazz) => {
+        try {
+          // Resolving or not doesn't seem to matter
+          // Don't resolve
+          var t = classLoader.loadClass(clazz, false);
+          // Force resolve
+          // var t = cLoader.loadClass(classesToLoad[i], true);
+          loaded++;
+          if (loaded % 1000 == 0) {
+            log(` [+] Have caught at least ${loaded} functions so far...`);
+          }
+        } catch (error) {
+          errorLoading++;
+          log(` [-] Skipping errored class : ${clazz} : ${error}`);
+        }
+      });
+    } else {
+      log(`[!] No classloader found, unable to forceload classes`);
+    }
+  });
+  log(`  [*] Done hunting loaded classes`);
+  log(`   [*] Loaded : ${loaded}`);
+  if (errorLoading > 0) {
+    log(`   [!] errorLoading : ${errorLoading}`);
+  }
 }
 
 export function dumpDexFiles() {
