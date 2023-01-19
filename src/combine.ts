@@ -77,8 +77,7 @@ function writeDexFile(file: File): string {
 }
 
 async function main() {
-
-  console.log(`[*] SecNeo Stolen Bytecode Rebuilder\n`)
+  console.log(`[*] SecNeo Stolen Bytecode Rebuilder\n`);
 
   const directory = './dumped';
   const bytecodeData = JSON.parse(fs.readFileSync(`${directory}/data.json`, 'utf-8'));
