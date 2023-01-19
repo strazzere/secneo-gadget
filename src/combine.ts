@@ -81,15 +81,20 @@ async function main() {
     throw new Error(`Unable to find any bytecode data to replace`);
   }
 
-  console.time(` [!] Deduping`);
   const decryptedCodes: string[] = [];
   const needles: string[] = [];
-  bytecodeData.forEach((element: any) => {
-    if (element?.data && !needles.includes(element.needle)) {
-      decryptedCodes.push(element.data);
-      needles.push(element.needle);
+
+  console.time(` [!] Deduping`);
+  for (let i = 0; i < bytecodeData.length; i++) {
+    if (
+      bytecodeData[i]?.needle &&
+      bytecodeData[i]?.data &&
+      !needles.includes(bytecodeData[i].needle)
+    ) {
+      decryptedCodes.push(bytecodeData[i].data);
+      needles.push(bytecodeData[i].needle);
     }
-  });
+  }
   console.timeEnd(` [!] Deduping`);
   const dupesRemoved = bytecodeData.length - decryptedCodes.length;
   console.log(
@@ -99,39 +104,64 @@ async function main() {
         : ''
     }`,
   );
+  const saveDeduped = true;
+  if (saveDeduped) {
+    const deduped = [];
+    for (let i = 0; i < decryptedCodes.length; i++) {
+      deduped.push({ needle: needles[i], data: decryptedCodes[i] });
+    }
+
+    fs.writeFileSync(`./deduped.json`, JSON.stringify(deduped));
+  }
+
+  // Would be more interesting if we could dynamically type that these don't have issues
+  // but for the time being, I don't care much to solve that and we can just hardcode them
+  // from knowledge derived from past runs
+  const dexToSkip = [
+    `unpacked_0xb40000703970cfdc_1c2254.dex`,
+    `unpacked_0xb40000703951ffdc_1ec37c.dex`,
+    `unpacked_0xb400007039289fdc_295d44.dex`,
+    `unpacked_0xb400007038e24fdc_4647a0.dex`,
+    `unpacked_0xb400007038ba1fdc_282fc0.dex`,
+  ];
 
   const dexFiles = fs
     .readdirSync(directory)
     .filter((file) => file.endsWith('.dex'))
+    .filter((file) => !dexToSkip.includes(file))
     .map((file) => readDexFile(`${directory}/${file}`));
 
   console.log(` [+] Read in ${dexFiles.length} dex files`);
 
   const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
-  // start the progress bar with a total value of 200 and start value of 0
   progress.start(decryptedCodes.length, 0);
   console.time(' [+] Function Matching');
   const matched: string[] = [];
   const unmatched: string[] = [];
-  decryptedCodes.forEach((decryptedCode, index) => {
-    const needle = Buffer.from(needles[index], 'hex');
-    const written = dexFiles.some((dexFile) => {
-      if (dexFile.dataSegment.buffer.includes(needle)) {
-        const codeBuffer = Buffer.from(decryptedCode, 'hex');
-        dexFile.dataSegment.hits++;
-        codeBuffer.copy(dexFile.dataSegment.buffer, dexFile.dataSegment.buffer.indexOf(needle));
-        return true;
+
+  // This is actually faster over the long run than using a forEach
+  for (let i = 0; i < decryptedCodes.length; i++) {
+    const needle = Buffer.from(needles[i], 'hex');
+    let written = false;
+    for (let x = 0; x < dexFiles.length; x++) {
+      const index = dexFiles[x].dataSegment.buffer.indexOf(needle);
+      if (index !== -1) {
+        const codeBuffer = Buffer.from(decryptedCodes[i], 'hex');
+        dexFiles[x].dataSegment.hits++;
+        codeBuffer.copy(dexFiles[x].dataSegment.buffer, index);
+        written = true;
+        break;
       }
-      return false;
-    });
+    }
+
     if (written) {
       progress.increment();
-      matched.push(decryptedCode);
+      matched.push(decryptedCodes[i]);
     } else {
-      unmatched.push(needles[index]);
+      unmatched.push(needles[i]);
     }
-  });
+  }
 
   progress.stop();
   console.timeEnd(' [+] Function Matching');
