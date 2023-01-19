@@ -71,7 +71,7 @@ export function forceLoadClasses() {
   Java.performNow(() => {
     const dexclassLoader = Java.use('dalvik.system.DexClassLoader');
     dexclassLoader.loadClass.overload('java.lang.String').implementation = function (name) {
-      var result = this.loadClass(name, false);
+      const result = this.loadClass(name, false);
       if (!cLoader) {
         cLoader = this;
         log('  [+] Classloader found, attempting to load classes now!');
@@ -101,9 +101,9 @@ function loadClasses(classLoader: Java.Wrapper<object>) {
         try {
           // Resolving or not doesn't seem to matter
           // Don't resolve
-          var t = classLoader.loadClass(clazz, false);
+          classLoader.loadClass(clazz, false);
           // Force resolve
-          // var t = cLoader.loadClass(classesToLoad[i], true);
+          // classLoader.loadClass(classesToLoad[i], true);
           loaded++;
           if (loaded % 1000 == 0) {
             log(` [+] Have caught at least ${loaded} functions so far...`);
@@ -1070,4 +1070,8 @@ export function hookDexHelper() {
   //     }
   //   },
   // });
+}
+
+function getNeededClasses(): string[] {
+  return []
 }
