@@ -1,10 +1,9 @@
 import { log } from './logger';
 import { Stack } from './stack';
-import { hookDexHelper, secneoJavaHooks } from './secneo';
+import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo';
 import { dlopenExtHook } from './jni';
 import { hookCallFunction } from './linker';
 import { antiDebug } from './anti';
-import { JNI } from './art';
 
 // Oddly this is a string
 const targetedAndroidVersion = '13';
@@ -62,6 +61,7 @@ if (!hooked) {
       // which follow it
       antiDebug();
       secneoJavaHooks();
+      forceLoadClasses();
     },
     function (_context) {
       // This appears to be too late to call the hook
