@@ -1,6 +1,5 @@
 import fs from 'fs';
 import cliProgress from 'cli-progress';
-import { findSourceMap } from 'module';
 
 // 00000000  64 65 78 0a 30 33 37 00  d9 46 30 17 6c 32 ed 82  |dex.037..F0.l2..|
 // 00000010  5d 65 ec 24 8b fb fe 96  82 08 8d 77 21 76 31 06  |]e.$.......w!v1.|
@@ -46,7 +45,7 @@ function getDataSegment(buffer: Buffer): DataSegment {
   }
 
   const dataSegment = Buffer.allocUnsafe(dataSize);
-  buffer.copy(dataSegment, 0, dataOffset, dataSize);
+  buffer.copy(dataSegment, 0, dataOffset, dataOffset + dataSize);
 
   return {
     offset: dataOffset,
@@ -61,16 +60,12 @@ function readDexFile(file: string): File {
     dataSegment: getDataSegment(fs.readFileSync(file)),
   };
 }
+
 function writeDexFile(file: File): string {
   const wholeFile = fs.readFileSync(file.fileName);
-  file.dataSegment.buffer.copy(
-    wholeFile,
-    file.dataSegment.offset,
-    0,
-    file.dataSegment.buffer.length,
-  );
+  file.dataSegment.buffer.copy(wholeFile, file.dataSegment.offset);
 
-  const newFileName = `${file.fileName}.fixed`;
+  const newFileName = `${file.fileName}.fixed.dex`;
   fs.writeFileSync(newFileName, wholeFile);
 
   return newFileName;
@@ -86,15 +81,19 @@ async function main() {
     throw new Error(`Unable to find any bytecode data to replace`);
   }
 
-  const deduped: string[] = [];
+  console.time(` [!] Deduping`);
+  const decryptedCodes: string[] = [];
+  const needles: string[] = [];
   bytecodeData.forEach((element: any) => {
-    if (element?.data && !deduped.includes(element.data)) {
-      deduped.push(element.data);
+    if (element?.data && !needles.includes(element.needle)) {
+      decryptedCodes.push(element.data);
+      needles.push(element.needle);
     }
   });
-  const dupesRemoved = bytecodeData.length - deduped.length;
+  console.timeEnd(` [!] Deduping`);
+  const dupesRemoved = bytecodeData.length - decryptedCodes.length;
   console.log(
-    ` [+] Dex methods to recover: ${deduped.length} ${
+    ` [+] Dex methods to recover: ${decryptedCodes.length} ${
       dupesRemoved > 0
         ? `(${dupesRemoved} duplicate${dupesRemoved > 1 ? 's removed' : ' removed'})`
         : ''
@@ -111,29 +110,26 @@ async function main() {
   const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
   // start the progress bar with a total value of 200 and start value of 0
-  progress.start(deduped.length, 0);
+  progress.start(decryptedCodes.length, 0);
   console.time(' [+] Function Matching');
-  let matched: string[] = [];
-  let unmatched: string[] = [];
-  deduped.forEach((codeItem) => {
-    const codeBuffer = Buffer.from(codeItem, 'hex');
-    const codeNeedle = codeBuffer.slice(0, 11);
+  const matched: string[] = [];
+  const unmatched: string[] = [];
+  decryptedCodes.forEach((decryptedCode, index) => {
+    const needle = Buffer.from(needles[index], 'hex');
     const written = dexFiles.some((dexFile) => {
-      if (dexFile.dataSegment.buffer.includes(codeNeedle)) {
+      if (dexFile.dataSegment.buffer.includes(needle)) {
+        const codeBuffer = Buffer.from(decryptedCode, 'hex');
         dexFile.dataSegment.hits++;
-        dexFile.dataSegment.buffer.write(
-          codeBuffer.toString(),
-          dexFile.dataSegment.buffer.indexOf(codeNeedle),
-        );
+        codeBuffer.copy(dexFile.dataSegment.buffer, dexFile.dataSegment.buffer.indexOf(needle));
         return true;
       }
       return false;
     });
     if (written) {
       progress.increment();
-      matched.push(codeItem);
+      matched.push(decryptedCode);
     } else {
-      unmatched.push(codeItem);
+      unmatched.push(needles[index]);
     }
   });
 
@@ -147,7 +143,9 @@ async function main() {
 
   dexFiles.forEach((file) => {
     const writtenFile = writeDexFile(file);
-    console.log(` [+] Wrote out fixed dex file ${writtenFile}`);
+    console.log(
+      ` [+] Wrote out fixed dex file ${writtenFile} which contained ${file.dataSegment.hits}`,
+    );
   });
 }
 
