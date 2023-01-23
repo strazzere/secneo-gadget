@@ -84,23 +84,26 @@ async function main() {
   const decryptedCodes: string[] = [];
   const needles: string[] = [];
 
-  console.time(` [!] Deduping`);
+  console.time(` [!] Removed duplicates and unneeded functions`);
   for (let i = 0; i < bytecodeData.length; i++) {
-    if (
-      bytecodeData[i]?.needle &&
-      bytecodeData[i]?.data &&
-      !needles.includes(bytecodeData[i].needle)
-    ) {
-      decryptedCodes.push(bytecodeData[i].data);
-      needles.push(bytecodeData[i].needle);
-    }
+    if (bytecodeData[i]?.needle !== bytecodeData[i]?.data)
+      if (
+        bytecodeData[i]?.needle &&
+        bytecodeData[i]?.data &&
+        // We don't need to bother searching for a needle that is going to be replaces by the same thing
+        bytecodeData[i]?.needle !== bytecodeData[i]?.data &&
+        !needles.includes(bytecodeData[i].needle)
+      ) {
+        decryptedCodes.push(bytecodeData[i].data);
+        needles.push(bytecodeData[i].needle);
+      }
   }
-  console.timeEnd(` [!] Deduping`);
-  const dupesRemoved = bytecodeData.length - decryptedCodes.length;
+  console.timeEnd(` [!] Removed duplicates and unneeded functions`);
+  const itemsRemoved = bytecodeData.length - decryptedCodes.length;
   console.log(
     ` [+] Dex methods to recover: ${decryptedCodes.length} ${
-      dupesRemoved > 0
-        ? `(${dupesRemoved} duplicate${dupesRemoved > 1 ? 's removed' : ' removed'})`
+      itemsRemoved > 0
+        ? `(${itemsRemoved} unneeded method${itemsRemoved > 1 ? 's removed' : ' removed'})`
         : ''
     }`,
   );
@@ -117,12 +120,21 @@ async function main() {
   // Would be more interesting if we could dynamically type that these don't have issues
   // but for the time being, I don't care much to solve that and we can just hardcode them
   // from knowledge derived from past runs
-  const dexToSkip = [
-    `unpacked_0xb40000703970cfdc_1c2254.dex`,
-    `unpacked_0xb40000703951ffdc_1ec37c.dex`,
-    `unpacked_0xb400007039289fdc_295d44.dex`,
-    `unpacked_0xb400007038e24fdc_4647a0.dex`,
-    `unpacked_0xb400007038ba1fdc_282fc0.dex`,
+  //
+  // Specific to 1.8 dump
+  //    `unpacked_0xb40000703970cfdc_1c2254.dex`,
+  //    `unpacked_0xb40000703951ffdc_1ec37c.dex`,
+  //    `unpacked_0xb400007039289fdc_295d44.dex`,
+  //    `unpacked_0xb400007038e24fdc_4647a0.dex`,
+  //    `unpacked_0xb400007038ba1fdc_282fc0.dex`,
+  //
+  const dexToSkip: string[] = [
+    'unpacked_0xb400006e97441ff0_45c21c.dex',
+    'unpacked_0xb400006e9789eff0_33b3ac.dex',
+    'unpacked_0xb400006e97bdaff0_2776d8.dex',
+    'unpacked_0xb400006e97e52ff0_443c3c.dex',
+    'unpacked_0xb400006e98296ff0_1a3918.dex',
+    'unpacked_0xb400006e9843aff0_1e2148.dex'
   ];
 
   const dexFiles = fs
