@@ -134,7 +134,7 @@ async function main() {
     'unpacked_0xb400006e97bdaff0_2776d8.dex',
     'unpacked_0xb400006e97e52ff0_443c3c.dex',
     'unpacked_0xb400006e98296ff0_1a3918.dex',
-    'unpacked_0xb400006e9843aff0_1e2148.dex'
+    'unpacked_0xb400006e9843aff0_1e2148.dex',
   ];
 
   const dexFiles = fs

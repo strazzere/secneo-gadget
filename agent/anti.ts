@@ -118,7 +118,7 @@ function connectHook() {
   }
 }
 
-function unlinkHook() {
+function _unlinkHook() {
   const unlinkPtr = Module.findExportByName(null, 'unlink');
   if (unlinkPtr) {
     if (debug) {

@@ -2,7 +2,6 @@ import frida, { Application } from 'frida';
 import fs from 'fs';
 import { exec } from 'child_process';
 import repl from 'repl';
-import { V4MAPPED } from 'dns';
 import { Script } from 'frida/dist/script';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -1,6 +1,6 @@
 import { log } from './logger';
 import { Stack } from './stack';
-import { hookDexHelper, secneoJavaHooks, forceLoadClasses, dumpDexFiles } from './secneo';
+import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo';
 import { dlopenExtHook } from './jni';
 import { hookCallFunction } from './linker';
 import { antiDebug } from './anti';

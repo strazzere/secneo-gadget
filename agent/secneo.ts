@@ -1,7 +1,6 @@
 import { log } from './logger';
 import { Stack } from './stack';
 import { writeDexToFile } from './dex';
-import { JNI } from './art';
 
 const targetLibrary = 'libDexHelper.so';
 const debug = false;
@@ -55,24 +54,6 @@ export function secneoJavaHooks() {
 
       this.handleAppStartUp(context, startUpActivityOrder);
     };
-
-    // We likely don't need this as we can hijack the classloader before this crash
-    // Likely we can just return false here? com.dji.activate.ActivateUtils.b(SourceFile:2)
-    const ActivateTools = Java.use(`com.dji.activate.ActivateUtils`);
-    ActivateTools.b.overload().implementation = function () {
-      // if (debug) {
-      log(`ActivateTools is returning false`);
-      // }
-      return false;
-    };
-
-    // We likely don't need this as we can hijack the classloader before this crash
-    const DJIServiceBuilder = Java.use(`com.dji.component.application.DJIServiceBuilder`);
-    DJIServiceBuilder.a.overload('dji.service.IDJIService').implementation = function (
-      idjiService: Java.Wrapper<object>,
-    ) {
-      log(`HIT DJISERVICEBUILDER`);
-    };
   });
 }
 
@@ -100,7 +81,7 @@ function loadClasses(classLoader: Java.Wrapper<object>) {
   Java.performNow(function () {
     if (classLoader != null) {
       let classesToLoad: string[] = []; //Java.enumerateLoadedClassesSync();
-      let neededClasses = getNeededClasses();
+      const neededClasses = getNeededClasses();
       if (neededClasses && neededClasses.length > 0) {
         classesToLoad = classesToLoad.concat(neededClasses);
       }
@@ -479,7 +460,7 @@ function _unprotectLibArt() {
 
 // uint32_t insns_size_in_code_units_;  // size of the insns array, in 2 byte code units
 // uint16_t insns_[1];                  // actual array of bytecode.
-function readCodeItem(codeItem: NativePointer) {
+function _readCodeItem(codeItem: NativePointer) {
   const registers_size = codeItem.readU16();
   const ins_size = codeItem.add(2).readU16();
   const outs_size = codeItem.add(4).readU16();
@@ -597,7 +578,6 @@ function hookedArt() {
       const codeItem = getCodeItem(this.curArtMethod);
       if (codeItem.compare(0) !== 0) {
         this.incomingCodeItem = getCodeItemData(codeItem);
-        let a = new ArrayBuffer(1);
         // All the code item parts and the first four known bytes we just confirmed above along with the identifier
         // which should be unique
         this.needle = codeItem.readByteArray(16 + 8);
@@ -628,12 +608,12 @@ function hookedArt() {
   });
 }
 
-function linkerHooks() {
+function _linkerHooks() {
   const linkerHook = dexBase.add(0xa6ed4);
   Interceptor.attach(linkerHook, {
     onEnter: function (args) {
       log(`*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `);
-      const library = args[0].readUtf8String();
+      // const library = args[0].readUtf8String();
       // if (library?.includes('libc++_shared.so')) {
       //   secneoJavaHooks()
       // }
@@ -642,7 +622,7 @@ function linkerHooks() {
       //   args[0] = Memory.allocUtf8String(library)
       // }
     },
-    onLeave: function (retval) {
+    onLeave: function (_retval) {
       log(`*************************************** EXITING linkerHook`);
     },
   });
