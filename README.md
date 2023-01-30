@@ -17,6 +17,29 @@ Script expects the correct version (that matches the node dependencies) of `frid
 The target application (`dji.go.v5`) should also be installed. Then install all npm dependencies via
 `npm install . -ci`.
 
+### Actually dumping the files
+
+You'll need to enable the `dumpDexFiles()` call in `agent/secneo.ts` first, this will allow you to dump the `classes.dex` files on the fly. Pull these from the device `/data/data/dji.go.v5` (or a different package name if needed) - then find which classes need to be force loaded;
+
+```sh
+grep -r "nop" -A 3 out | grep "const" | grep -v 'x0, 0x0' | grep 'v0, 0x' | cut -d'.' -f1 | cut -d'/' -f3- | sort | uniq
+```
+
+The above may need to be adjusted a bit, however it should generally speaking work after you have run `baksmali` on all the dumped files. It works by trying to find methods that have the characteristic `nop const` pattern;
+
+```smali
+# virtual methods
+.method public onFailure(Ljava/lang/Throwable;ILjava/lang/String;)V
+    .registers 6
+
+    :catch_0
+    nop
+
+    const v0, 0x1467acbd
+```
+
+Then sort and unique the file/classnames for usage in the agent. Take this list and replace the list in the `getNeededClasses()` - these will be forced loaded into the `ClassLoader` which should allow us to catch the decrypted methods.
+
 ## Agent Only usage
 
 ### How to compile & load for debugging
