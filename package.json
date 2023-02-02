@@ -17,6 +17,7 @@
     "lint": "npx eslint research/jdwp/*.ts src/*.ts agent/*.ts",
     "start": "npm run prepare && node build/index.js",
     "spawn": "frida -U -f dji.go.v5 -l build/_agent.js",
+    "spawn-pilot": "frida -U -f com.dji.industry.pilot -l build/_agent.js",
     "combine": "tsc && node build/combine.js"
   },
   "devDependencies": {
