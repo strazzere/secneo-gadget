@@ -17,7 +17,7 @@ export function antiDebug() {
   ptraceHook();
   tracerHook();
   hookKill();
-  hookAbort();
+  // hookAbort();
   hookExits();
   hookRaise();
   if (debug) {
@@ -192,10 +192,9 @@ function tracerHook() {
           const retval = fgets(stream, size, fp);
           const str = stream.readUtf8String();
           if (str && str !== 'TracerPid:\t0\n' && str.indexOf('TracerPid:') > -1) {
-            log(Buffer.from(str).toString('hex'));
             stream.writeUtf8String('TracerPid:\t0\n');
             log(
-              ` [!] tracer : changing fgets buffer to have no tracer pid from ${this.context.pc}`,
+              ` [!] tracer : changing fgets buffer to have no tracer pid from ${Stack.getModuleInfo(this.returnAddress)}}`,
             );
           }
           return retval;
@@ -238,7 +237,8 @@ function hookAbort() {
       abortPtr,
       new NativeCallback(
         function (status) {
-          log(`[+] abort : ${status}`);
+          log(`[+] abort : ${status} : via ${Stack.getModuleInfo(this.returnAddress)}`);
+          log(Stack.native(this.context))
           log(`IGNORING ABORT`);
           return 0;
         },
