@@ -4,7 +4,7 @@ import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo';
 import { dlopenExtHook } from './jni';
 import { hookCallFunction } from './linker';
 import { antiDebug } from './anti';
-import { getPackageName } from './dex'
+import { getPackageName } from './dex';
 
 // Oddly this is a string
 const targetedAndroidVersion = '13';
@@ -48,7 +48,7 @@ hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
 
 let hooked = false;
 if (!hooked) {
-  const packagename = getPackageName()
+  const packagename = getPackageName();
 
   const hookFunctions = (anti: boolean) => {
     hooked = true;
@@ -62,12 +62,12 @@ if (!hooked) {
 
     secneoJavaHooks();
     forceLoadClasses();
-  }
+  };
 
   // Currently the pilot versions we have seen utilize a different version or style of
   // secneo, so we need to attach to the post fork'ed process
   if (packagename.includes('pilot')) {
-    hookFunctions(false)
+    hookFunctions(false);
   } else {
     dlopenExtHook(
       'libDexHelper.so',
@@ -76,7 +76,7 @@ if (!hooked) {
           event: 'dlopenExtHook',
           detail: 'Hit hook, attempting to set hooks inside lib',
         });
-        hookFunctions(true)
+        hookFunctions(true);
       },
       function (_context) {
         // This appears to be too late to call the hook

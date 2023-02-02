@@ -194,7 +194,9 @@ function tracerHook() {
           if (str && str !== 'TracerPid:\t0\n' && str.indexOf('TracerPid:') > -1) {
             stream.writeUtf8String('TracerPid:\t0\n');
             log(
-              ` [!] tracer : changing fgets buffer to have no tracer pid from ${Stack.getModuleInfo(this.returnAddress)}}`,
+              ` [!] tracer : changing fgets buffer to have no tracer pid from ${Stack.getModuleInfo(
+                this.returnAddress,
+              )}}`,
             );
           }
           return retval;
@@ -238,7 +240,7 @@ function hookAbort() {
       new NativeCallback(
         function (status) {
           log(`[+] abort : ${status} : via ${Stack.getModuleInfo(this.returnAddress)}`);
-          log(Stack.native(this.context))
+          log(Stack.native(this.context));
           log(`IGNORING ABORT`);
           return 0;
         },
