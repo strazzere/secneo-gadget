@@ -238,7 +238,7 @@ export function findHooks(module: Module) {
           log(
             hexdump(module.base.add(section.memoryOffset).add(start), {
               offset: 0,
-              length: end - start,
+              length: end - start + 1,
               header: true,
               ansi: true,
             }),
