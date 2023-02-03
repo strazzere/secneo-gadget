@@ -5,6 +5,7 @@ import { dlopenExtHook } from './jni';
 import { hookCallFunction } from './linker';
 import { antiDebug } from './anti';
 import { getPackageName } from './dex';
+import { processRelevantModules } from './elf';
 
 // Oddly this is a string
 const targetedAndroidVersion = '13';
@@ -68,6 +69,7 @@ if (!hooked) {
   // secneo, so we need to attach to the post fork'ed process
   if (packagename.includes('pilot')) {
     hookFunctions(false);
+    processRelevantModules();
   } else {
     dlopenExtHook(
       'libDexHelper.so',

@@ -11,13 +11,17 @@ import { log } from './logger';
 // Based off older code and concepts from lich4/lichao890427
 
 // Helper function for creating a native function for usage
-function getNativeFunction(name: string, ret, args): NativeFunction<any, any> {
-  var mod = Module.findExportByName(null, name);
+function getNativeFunction(
+  name: string,
+  ret: NativeFunctionReturnType,
+  args: NativeFunctionArgumentType[],
+): NativeFunction<any, any> {
+  const mod = Module.findExportByName(null, name);
   if (!mod) {
     throw new Error(`Unable to location module ${name}`);
   }
 
-  var func = new NativeFunction(mod, ret, args);
+  const func = new NativeFunction(mod, ret, args);
   if (typeof func === 'undefined') {
     throw Error(`Unable to create the NativeFunction for ${name} using ${ret} and ${args}`);
   }
@@ -60,7 +64,7 @@ function getElfData(module: Module): ElfData | undefined {
   }
 
   // Get elf header
-  var header = Memory.alloc(64);
+  const header = Memory.alloc(64);
   lseekPtr(fd, 0, 0 /* SEEK_SET */);
   readPtr(fd, header, 64);
 
@@ -96,7 +100,7 @@ function getElfData(module: Module): ElfData | undefined {
   lseekPtr(fd, stringTableOffset, 0 /* SEEK_SET */);
   readPtr(fd, stringTable, stringTableSize);
 
-  for (var i = 0; i < sectionHeaderCount; i++) {
+  for (let i = 0; i < sectionHeaderCount; i++) {
     let sectionName = stringTable
       .add(sectionHeaders.add(i * sectionHeaderSize).readU32())
       .readUtf8String();
@@ -141,83 +145,40 @@ function getElfData(module: Module): ElfData | undefined {
     elfData.sections.push(section);
   }
 
-  let dynsym = elfData.sections.filter((section) => section.name === '.dynsym').at(0);
-  let dynstr = elfData.sections.filter((section) => section.name === '.dynstr').at(0);
+  const dynsym = elfData.sections.filter((section) => section.name === '.dynsym').at(0);
+  const dynstr = elfData.sections.filter((section) => section.name === '.dynstr').at(0);
 
   if (dynsym && dynstr) {
-    let stringTable = module.base.add(dynstr.memoryOffset);
-    let structSize = is32 ? 16 : 24;
-    for (var i = 0; i < dynsym.size / structSize; i++) {
-      var symbolOffset = module.base
-        .add(dynsym.memoryOffset)
-        .add(structSize * i)
-        .readU32();
-      let symbolString = stringTable.add(symbolOffset).readUtf8String();
+    const stringTable = module.base.add(dynstr.memoryOffset);
+    const structSize = is32 ? 16 : 24;
+    for (let i = 0; i < dynsym.size / structSize; i++) {
+      const symbolOffset = module.base.add(dynsym.memoryOffset + structSize * i).readU32();
+      const symbolString = stringTable.add(symbolOffset).readUtf8String();
       if (symbolString) {
         elfData.symbols.push(symbolString);
       }
     }
   }
 
-  let reldyn = elfData.sections.filter((section) => section.name === '.reldyn').at(0);
+  const reldyn = elfData.sections.filter((section) => section.name === '.reldyn').at(0);
   elfData.relmap = new Map();
   if (reldyn) {
-    for (var i = 0; i < reldyn.size / 8; i++) {
-      if (
-        module.base
-          .add(reldyn.memoryOffset)
-          .add(i * 8)
-          .readU32() !== 0 &&
-        module.base
-          .add(reldyn.memoryOffset)
-          .add(i * 8)
-          .add(4)
-          .readU32() >>
-          8 !==
-          0
-      ) {
-        elfData.relmap[
-          module.base
-            .add(reldyn.memoryOffset)
-            .add(i * 8)
-            .readU32()
-        ] =
-          module.base
-            .add(reldyn.memoryOffset)
-            .add(i * 8)
-            .add(4)
-            .readU32() >> 8;
+    for (let i = 0; i < reldyn.size / 8; i++) {
+      const key = module.base.add(reldyn.memoryOffset + i * 8).readU32();
+      const value = module.base.add(reldyn.memoryOffset + i * 8 + 4).readU32() >> 8;
+      if (key !== 0 && value !== 0) {
+        elfData.relmap.set(key, value);
       }
     }
   }
 
-  let relplt = elfData.sections.filter((section) => section.name === '.relplt').at(0);
+  const relplt = elfData.sections.filter((section) => section.name === '.relplt').at(0);
   if (relplt) {
-    for (var i = 0; i < relplt.size / 8; i++) {
-      if (
-        module.base
-          .add(relplt.memoryOffset)
-          .add(i * 8)
-          .readU32() !== 0 &&
-        module.base
-          .add(relplt.memoryOffset)
-          .add(i * 8)
-          .add(4)
-          .readU32() >>
-          8 !==
-          0
-      ) {
-        elfData.relmap[
-          module.base
-            .add(relplt.memoryOffset)
-            .add(i * 8)
-            .readU32()
-        ] =
-          module.base
-            .add(relplt.memoryOffset)
-            .add(i * 8)
-            .add(4)
-            .readU32() >> 8;
+    for (let i = 0; i < relplt.size / 8; i++) {
+      const key = module.base.add(relplt.memoryOffset + i * 8).readU32();
+      const value = module.base.add(relplt.memoryOffset + i * 8 + 4).readU32() >> 8;
+      if (key !== 0 && value !== 0) {
+        elfData.relmap.set(key, value);
       }
     }
   }
@@ -225,42 +186,40 @@ function getElfData(module: Module): ElfData | undefined {
   return elfData;
 }
 
-export function findHooks(module) {
-  if (module.sections === undefined) {
-    if (!getElfData(module)) {
-      return undefined;
-    }
+export function findHooks(module: Module) {
+  const elfData = getElfData(module);
+  if (!elfData) {
+    return;
   }
 
-  module.sections.forEach((section) => {
-    if (section.size === 0) {
+  const hookableSections = elfData.sections.filter((section) =>
+    ['.rodata', '.text'].includes(section.name),
+  );
+
+  hookableSections.forEach((section) => {
+    if (section === undefined || section.data === undefined || section.size === 0) {
       return;
     }
 
     // It's important to cast the ArrayBuffer returned by `readByteArray` cannot be referenced incrementally
-
-    var file = new Uint8Array(section.data.readByteArray(section.size));
-    var memory = new Uint8Array(module.base.add(section.memoryOffset).readByteArray(section.size));
-    for (var i = 0; i < section.size; ) {
-      if (['.rodata', '.text'].includes(section.name)) {
-        if (file[i] != memory[i]) {
-          log(
-            '*** Potential variance found at ',
-            DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(i)),
-          );
-          i += 4;
-        }
-        i++;
-      } else if (['.got'].includes(section.name)) {
-        break;
-        // It shouldn't be as the got table isn't initialized until execution
-        if (file[i] != memory[i]) {
-          // todo compare the symbol to string against what it resolves too
-        }
-        i += module.is32 ? 4 : 8;
-      } else {
-        // Unscanned sections, to be added as needed
-        break;
+    const sectionBuffer = section.data.readByteArray(section.size);
+    if (!sectionBuffer) {
+      return;
+    }
+    const file = new Uint8Array(sectionBuffer);
+    const memoryBuffer = module.base.add(section.memoryOffset).readByteArray(section.size);
+    if (!memoryBuffer) {
+      return;
+    }
+    const memory = new Uint8Array(memoryBuffer);
+    for (let i = 0; i < section.size; i++) {
+      if (file[i] !== memory[i]) {
+        log(
+          `*** Potential variance found at ${DebugSymbol.fromAddress(
+            module.base.add(section.memoryOffset).add(i),
+          )}`,
+        );
+        i += Process.pointerSize;
       }
     }
   });
@@ -270,12 +229,12 @@ export function findHooks(module) {
 // was injected into an APK otherwise it won't work.
 function getPackageName() {
   const cmdLine = Memory.allocUtf8String('/proc/self/cmdline');
-  var fd = openPtr(cmdLine, 0 /* O_RDONLY */, 0);
-  if (fd == -1) {
+  const fd = openPtr(cmdLine, 0 /* O_RDONLY */, 0);
+  if (fd === -1) {
     return 'null';
   }
 
-  var buffer = Memory.alloc(32);
+  const buffer = Memory.alloc(32);
   readPtr(fd, buffer, 32);
   closePtr(fd);
 
@@ -313,7 +272,6 @@ function getRelevantModules() {
 
 export function processRelevantModules() {
   getRelevantModules().forEach((module) => {
-    getElfData(module);
     findHooks(module);
   });
 }
