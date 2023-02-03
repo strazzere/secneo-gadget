@@ -145,8 +145,8 @@ function getElfData(module: Module): ElfData | undefined {
     elfData.sections.push(section);
   }
 
-  const dynsym = elfData.sections.filter((section) => section.name === '.dynsym').at(0);
-  const dynstr = elfData.sections.filter((section) => section.name === '.dynstr').at(0);
+  const dynsym = elfData.sections.filter((section) => section.name === '.dynsym')[0];
+  const dynstr = elfData.sections.filter((section) => section.name === '.dynstr')[0];
 
   if (dynsym && dynstr) {
     const stringTable = module.base.add(dynstr.memoryOffset);
@@ -160,7 +160,7 @@ function getElfData(module: Module): ElfData | undefined {
     }
   }
 
-  const reldyn = elfData.sections.filter((section) => section.name === '.reldyn').at(0);
+  const reldyn = elfData.sections.filter((section) => section.name === '.reldyn')[0];
   elfData.relmap = new Map();
   if (reldyn) {
     for (let i = 0; i < reldyn.size / 8; i++) {
@@ -172,7 +172,7 @@ function getElfData(module: Module): ElfData | undefined {
     }
   }
 
-  const relplt = elfData.sections.filter((section) => section.name === '.relplt').at(0);
+  const relplt = elfData.sections.filter((section) => section.name === '.relplt')[0];
   if (relplt) {
     for (let i = 0; i < relplt.size / 8; i++) {
       const key = module.base.add(relplt.memoryOffset + i * 8).readU32();
