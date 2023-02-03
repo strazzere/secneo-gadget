@@ -50,8 +50,6 @@ type ElfData = {
 };
 
 function getElfData(module: Module): ElfData | undefined {
-  log('Processing ', module.path);
-
   const elfData: ElfData = {
     is32: false,
     sections: [],
@@ -105,7 +103,7 @@ function getElfData(module: Module): ElfData | undefined {
       .add(sectionHeaders.add(i * sectionHeaderSize).readU32())
       .readUtf8String();
     if (!sectionName) {
-      sectionName = 'none';
+      sectionName = 'unknown';
     }
     const sectionAddress = is32
       ? sectionHeaders.add(i * sectionHeaderSize + 12).readU32()
@@ -138,7 +136,6 @@ function getElfData(module: Module): ElfData | undefined {
       lseekPtr(fd, sectionOffset, 0 /* SEEK_SET */);
       readPtr(fd, section.data, sectionSize);
     } else {
-      log('No data section for', section.name);
       section.data = undefined;
     }
 
@@ -212,14 +209,42 @@ export function findHooks(module: Module) {
       return;
     }
     const memory = new Uint8Array(memoryBuffer);
+    let start = -1;
+    let end = 0;
     for (let i = 0; i < section.size; i++) {
       if (file[i] !== memory[i]) {
-        log(
-          `*** Potential variance found at ${DebugSymbol.fromAddress(
-            module.base.add(section.memoryOffset).add(i),
-          )}`,
-        );
-        i += Process.pointerSize;
+        if (start === -1) {
+          start = i;
+        }
+      } else {
+        if (start !== -1) {
+          end = i - 1;
+          log(`[!] Potential variance found that is ${end - start} bytes long;`);
+          log(`${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} `);
+
+          try {
+            const instruction = Instruction.parse(module.base.add(section.memoryOffset).add(start));
+            // if (instruction.mnemonic === 'ldr') {
+            // const address = ptr(instruction.opStr.split('#')[1])
+            // log(`${address} : ${DebugSymbol.fromAddress(address)}`)
+            // }
+            const instruction2 = Instruction.parse(instruction.next);
+            i += instruction.size + instruction2.size;
+            log(` > ${instruction.toString()}`);
+            log(` > ${instruction2.toString()}`);
+          } catch (error) {
+            log('Unable to parse instructions');
+          }
+          log(
+            hexdump(module.base.add(section.memoryOffset).add(start), {
+              offset: 0,
+              length: end - start,
+              header: true,
+              ansi: true,
+            }),
+          );
+          start = -1;
+        }
       }
     }
   });
