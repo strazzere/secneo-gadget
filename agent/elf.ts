@@ -1,4 +1,5 @@
 import { log } from './logger';
+import { Stack } from './stack';
 // Script to gather the shared library from disk and also
 // from memory utilizing Frida. After reading the file from
 // disk, it will then compare some sections of the file in
@@ -219,30 +220,35 @@ export function findHooks(module: Module) {
       } else {
         if (start !== -1) {
           end = i - 1;
-          log(`[!] Potential variance found that is ${end - start} bytes long;`);
-          log(`${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} `);
 
           try {
-            const instruction = Instruction.parse(module.base.add(section.memoryOffset).add(start));
-            // if (instruction.mnemonic === 'ldr') {
-            // const address = ptr(instruction.opStr.split('#')[1])
-            // log(`${address} : ${DebugSymbol.fromAddress(address)}`)
-            // }
+            const instruction = (Instruction.parse(module.base.add(section.memoryOffset).add(start)) as Arm64Instruction);
+            log(`[!] Potential variance found that is ${end - start} bytes long;`);
+
+
+            if (['ldr'].includes(instruction.mnemonic)) {
+              const trampoline = (new NativePointer(instruction.operands[1].value as number)).readPointer()
+              log(`${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} => ${Stack.getModuleInfo(trampoline)}`);
+            } else {
+              log(`${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} `);
+            }
+
             const instruction2 = Instruction.parse(instruction.next);
             i += instruction.size + instruction2.size;
             log(` > ${instruction.toString()}`);
             log(` > ${instruction2.toString()}`);
+
+            log(
+              hexdump(module.base.add(section.memoryOffset).add(start), {
+                offset: 0,
+                length: 30,//end - start + 1,
+                header: true,
+                ansi: true,
+              }),
+            );
           } catch (error) {
             log('Unable to parse instructions');
           }
-          log(
-            hexdump(module.base.add(section.memoryOffset).add(start), {
-              offset: 0,
-              length: end - start + 1,
-              header: true,
-              ansi: true,
-            }),
-          );
           start = -1;
         }
       }
