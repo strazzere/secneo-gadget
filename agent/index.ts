@@ -50,18 +50,22 @@ hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
 let hooked = false;
 if (!hooked) {
   const packagename = getPackageName();
+  log(` [+] Hooking inside the package : ${packagename}`);
 
   const hookFunctions = (anti: boolean) => {
     hooked = true;
-    hookDexHelper(anti);
+    hookDexHelper(anti, true, true);
     // We don't actually need this for the purposes of doing any of the antidebug work
     // we just need to "slow down" execution for frida to catch the java hooks we want
     // which follow it
-    // if (anti) {
-    antiDebug();
-    // }
+    if (anti) {
+      antiDebug();
+    }
 
-    secneoJavaHooks();
+    if (!packagename.includes('pilot')) {
+      secneoJavaHooks();
+    }
+
     forceLoadClasses();
   };
 
@@ -69,7 +73,9 @@ if (!hooked) {
   // secneo, so we need to attach to the post fork'ed process
   if (packagename.includes('pilot')) {
     hookFunctions(false);
-    processRelevantModules();
+
+    // This is a great way to reveal where the hooking engine is working
+    // processRelevantModules();
   } else {
     dlopenExtHook(
       'libDexHelper.so',

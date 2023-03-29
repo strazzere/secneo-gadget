@@ -8,7 +8,7 @@ export function getPackageName() {
 
   // @ts-ignore
   let packageName = cmdline.readLine();
-  log(`packageName: ${packageName}`)
+  log(`packageName: ${packageName}`);
 
   // @ts-ignore
   cmdline.close();

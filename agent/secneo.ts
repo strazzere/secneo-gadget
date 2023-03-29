@@ -1,11 +1,14 @@
 import { log } from './logger';
 import { Stack } from './stack';
-import { writeDexToFile } from './dex';
+import { getPackageName, writeDexToFile } from './dex';
+import { NeedleMap } from './needle';
 
 const targetLibrary = 'libDexHelper.so';
 const debug = false;
 let dexBase: NativePointer;
 let cLoader: Java.Wrapper<object>;
+
+const needleMap = new NeedleMap();
 
 function getDexBase(): NativePointer {
   const base = Module.findBaseAddress(targetLibrary);
@@ -57,16 +60,14 @@ export function secneoJavaHooks() {
   });
 }
 
-export function forceLoadClasses() {
+function catchAndUseClassLoader(callback: (classLoader: Java.Wrapper<object>) => void) {
   Java.performNow(() => {
     const dexclassLoader = Java.use('dalvik.system.DexClassLoader');
     dexclassLoader.loadClass.overload('java.lang.String').implementation = function (name: string) {
       const result = this.loadClass(name, false);
       if (!cLoader) {
         cLoader = this;
-        log('  [+] Classloader found, attempting to load classes now!');
-        // Load these now incase the class loader object for some reason dies -- which does happen (removed likely)
-        loadClasses(cLoader);
+        callback(cLoader);
       }
 
       return result;
@@ -74,13 +75,49 @@ export function forceLoadClasses() {
   });
 }
 
+export function forceLoadClasses() {
+  const packagename = getPackageName();
+
+  if (!packagename.includes('pilot')) {
+    // We know this works fine for Fly, so just retain the logic
+    catchAndUseClassLoader((classLoader) => {
+      log('  [+] Classloader found, attempting to load classes now!');
+      // Load these now incase the class loader object for some reason dies -- which does happen (removed likely)
+      loadClasses(classLoader);
+    });
+  } else {
+    // This appears to always be present in secneo stubs, so we can use this to locate the correct classloader
+    const knownSecNeoClass = 'com/secneo/apkwrapper/AW';
+    let classLoaders = Java.enumerateClassLoadersSync();
+
+    classLoaders = classLoaders.filter((classLoader) => {
+      try {
+        classLoader.loadClass(knownSecNeoClass, false);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    });
+
+    if (classLoaders.length === 0) {
+      log(` [!] Unable to find a classloader used be SecNeo`);
+    } else if (classLoaders.length > 1) {
+      log(
+        ` [!] Found an abnormal amount of classloaders which may work, defaulting to first found...`,
+      );
+    }
+
+    loadClasses(classLoaders[0]);
+  }
+}
+
 function loadClasses(classLoader: Java.Wrapper<object>) {
   let loaded = 0;
   let errorLoading = 0;
 
   Java.performNow(function () {
-    if (classLoader != null) {
-      let classesToLoad: string[] = []; //Java.enumerateLoadedClassesSync();
+    if (classLoader !== null) {
+      let classesToLoad: string[] = [];
       const neededClasses = getNeededClasses();
       if (neededClasses && neededClasses.length > 0) {
         classesToLoad = classesToLoad.concat(neededClasses);
@@ -91,9 +128,9 @@ function loadClasses(classLoader: Java.Wrapper<object>) {
         try {
           // Resolving or not doesn't seem to matter
           // Don't resolve
-          classLoader.loadClass(clazz, false);
+          // classLoader.loadClass(clazz, false);
           // Force resolve
-          // classLoader.loadClass(classesToLoad[i], true);
+          classLoader.loadClass(clazz, true);
           loaded++;
           if (loaded % 1000 == 0) {
             log(` [+] Have caught at least ${loaded} functions so far...`);
@@ -111,6 +148,8 @@ function loadClasses(classLoader: Java.Wrapper<object>) {
   log(`   [*] Loaded : ${loaded}`);
   if (errorLoading > 0) {
     log(`   [!] errorLoading : ${errorLoading}`);
+  } else {
+    needleMap.close();
   }
 }
 
@@ -515,12 +554,8 @@ function getCodeItemData(codeItem: NativePointer): ArrayBuffer | null {
 
 function dumpCodeItem(needle: ArrayBuffer, codeItem: NativePointer) {
   const data = getCodeItemData(codeItem);
-  if (data) {
-    log(
-      `{"needle": "${Buffer.from(new Uint8Array(needle)).toString('hex')}", "data" : "${Buffer.from(
-        new Uint8Array(data),
-      ).toString('hex')}"},`,
-    );
+  if (data && needleMap.isOpen()) {
+    needleMap.writeNeedle(new Uint8Array(needle), new Uint8Array(data));
   }
 }
 
@@ -567,7 +602,7 @@ function hookedArt() {
   // LOAD:0000000000048DA4 ; hook_art_initialize_methods_function+19A4↓o ...
   //
   // void Instrumentation::InitializeMethodsCode(ArtMethod* method, const void* aot_code)
-  const initializeMethodsCode = dexBase.add(0x4cbc0); // pilot // fly dexBase.add(0x48da4);
+  const initializeMethodsCode = dexBase.add(0x49958); // pilot // fly dexBase.add(0x48da4);
   Interceptor.attach(initializeMethodsCode, {
     onEnter: function (args) {
       // args[0] InitializeMethodsCode itself?

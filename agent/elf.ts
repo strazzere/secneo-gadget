@@ -222,13 +222,20 @@ export function findHooks(module: Module) {
           end = i - 1;
 
           try {
-            const instruction = (Instruction.parse(module.base.add(section.memoryOffset).add(start)) as Arm64Instruction);
+            const instruction = Instruction.parse(
+              module.base.add(section.memoryOffset).add(start),
+            ) as Arm64Instruction;
             log(`[!] Potential variance found that is ${end - start} bytes long;`);
 
-
             if (['ldr'].includes(instruction.mnemonic)) {
-              const trampoline = (new NativePointer(instruction.operands[1].value as number)).readPointer()
-              log(`${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} => ${Stack.getModuleInfo(trampoline)}`);
+              const trampoline = new NativePointer(
+                instruction.operands[1].value as number,
+              ).readPointer();
+              log(
+                `${DebugSymbol.fromAddress(
+                  module.base.add(section.memoryOffset).add(start),
+                )} => ${Stack.getModuleInfo(trampoline)}`,
+              );
             } else {
               log(`${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} `);
             }
@@ -241,7 +248,7 @@ export function findHooks(module: Module) {
             log(
               hexdump(module.base.add(section.memoryOffset).add(start), {
                 offset: 0,
-                length: 30,//end - start + 1,
+                length: 30, //end - start + 1,
                 header: true,
                 ansi: true,
               }),
