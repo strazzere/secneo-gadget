@@ -1,5 +1,5 @@
-import { log } from './logger';
-import { Stack } from './stack';
+import { log } from './logger.ts';
+import { Stack } from './stack.ts';
 // Script to gather the shared library from disk and also
 // from memory utilizing Frida. After reading the file from
 // disk, it will then compare some sections of the file in
@@ -16,6 +16,7 @@ function getNativeFunction(
   name: string,
   ret: NativeFunctionReturnType,
   args: NativeFunctionArgumentType[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): NativeFunction<any, any> {
   const mod = Module.findExportByName(null, name);
   if (!mod) {

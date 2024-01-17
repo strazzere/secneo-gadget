@@ -44,7 +44,9 @@ enum MPROTECT_FLAGS {
   PROT_EXEC = 0x4,
   PROT_NONE = 0x0,
 
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   MAP_SHARED = 0x01,
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   MAP_PRIVATE = 0x02,
 
   MAP_FIXED = 0x10,

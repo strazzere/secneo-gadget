@@ -1,5 +1,5 @@
-import { log } from './logger';
-import { Stack } from './stack';
+import { log } from './logger.ts';
+import { Stack } from './stack.ts';
 
 const debug = true;
 

@@ -1,19 +1,19 @@
-import { log } from './logger';
+import { log } from './logger.ts';
 
-export function getPackageName() {
+export function getPackageName(): string | undefined {
   const pid = Process.id;
 
   // @ts-ignore
   const cmdline = new File(`/proc/${pid}/cmdline`, 'rb');
 
   // @ts-ignore
-  let packageName = cmdline.readLine();
+  let packageName: string | undefined = cmdline.readLine();
   log(`packageName: ${packageName}`);
 
   // @ts-ignore
   cmdline.close();
 
-  if (packageName.includes(':')) {
+  if (packageName && packageName.includes(':')) {
     packageName = packageName.split(':').at(0);
   }
 

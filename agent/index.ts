@@ -1,11 +1,11 @@
-import { log } from './logger';
-import { Stack } from './stack';
-import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo';
-import { dlopenExtHook } from './jni';
-import { hookCallFunction } from './linker';
-import { antiDebug } from './anti';
-import { getPackageName } from './dex';
-import { processRelevantModules } from './elf';
+import { log } from './logger.ts';
+import { Stack } from './stack.ts';
+import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo.ts';
+import { dlopenExtHook } from './jni.ts';
+import { hookCallFunction } from './linker.ts';
+import { antiDebug } from './anti.ts';
+import { getPackageName } from './dex.ts';
+import { processRelevantModules } from './elf.ts';
 
 // Oddly this is a string
 const targetedAndroidVersion = '13';
@@ -49,7 +49,11 @@ hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
 
 let hooked = false;
 if (!hooked) {
-  const packagename = getPackageName();
+  let packagename = getPackageName();
+  if (!packagename) {
+    log(` [!] Unable to obtain package name, likely everything will break`);
+    packagename = 'Unknown';
+  }
   log(` [+] Hooking inside the package : ${packagename}`);
 
   const hookFunctions = (anti: boolean) => {
@@ -62,7 +66,7 @@ if (!hooked) {
       antiDebug();
     }
 
-    if (!packagename.includes('pilot')) {
+    if (packagename && !packagename.includes('pilot')) {
       secneoJavaHooks();
     }
 
@@ -71,7 +75,7 @@ if (!hooked) {
 
   // Currently the pilot versions we have seen utilize a different version or style of
   // secneo, so we need to attach to the post fork'ed process
-  if (packagename.includes('pilot')) {
+  if (packagename && packagename.includes('pilot')) {
     hookFunctions(false);
 
     // This is a great way to reveal where the hooking engine is working

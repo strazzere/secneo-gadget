@@ -1,12 +1,12 @@
-import { getPackageName } from './dex';
-import { log } from './logger';
+import { getPackageName } from './dex.ts';
+import { log } from './logger.ts';
 
-import { createWriteStream } from 'fs';
+import { WriteStream, createWriteStream } from 'fs';
 
 export class NeedleMap {
   needles: number;
   fileName: string;
-  outputStream: any;
+  outputStream: WriteStream | undefined;
 
   constructor() {
     this.fileName = `/data/data/${getPackageName()}/needleMap.json`;

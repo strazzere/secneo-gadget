@@ -8,7 +8,10 @@
     "outDir": "build",
     "esModuleInterop": true,
     "strictPropertyInitialization": false,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "allowImportingTsExtensions": true,
   },
   "include": ["src/*.ts"],
   "exclude": [

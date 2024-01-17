@@ -1,7 +1,7 @@
-import { log } from './logger';
-import { Stack } from './stack';
-import { getPackageName, writeDexToFile } from './dex';
-import { NeedleMap } from './needle';
+import { log } from './logger.ts';
+import { Stack } from './stack.ts';
+import { getPackageName, writeDexToFile } from './dex.ts';
+import { NeedleMap } from './needle.ts';
 
 const targetLibrary = 'libDexHelper.so';
 const debug = false;
@@ -66,6 +66,7 @@ function catchAndUseClassLoader(callback: (classLoader: Java.Wrapper<object>) =>
     dexclassLoader.loadClass.overload('java.lang.String').implementation = function (name: string) {
       const result = this.loadClass(name, false);
       if (!cLoader) {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         cLoader = this;
         callback(cLoader);
       }
@@ -78,7 +79,7 @@ function catchAndUseClassLoader(callback: (classLoader: Java.Wrapper<object>) =>
 export function forceLoadClasses() {
   const packagename = getPackageName();
 
-  if (!packagename.includes('pilot')) {
+  if (packagename && !packagename.includes('pilot')) {
     // We know this works fine for Fly, so just retain the logic
     catchAndUseClassLoader((classLoader) => {
       log('  [+] Classloader found, attempting to load classes now!');
