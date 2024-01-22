@@ -9,9 +9,7 @@
     "esModuleInterop": true,
     "strictPropertyInitialization": false,
     "moduleResolution": "node",
-    "emitDeclarationOnly": true,
     "declaration": true,
-    "allowImportingTsExtensions": true,
   },
   "include": ["src/*.ts"],
   "exclude": [
@@ -19,6 +17,6 @@
     "node_modules",
     "./node_modules",
     "./node_modules/**/*",
-    "./node_modules/@types/node/index.d.ts"
-  ]
+    "./node_modules/@types/node/index.d.ts",
+  ],
 }

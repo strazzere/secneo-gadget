@@ -1,4 +1,4 @@
-import { log } from './logger.ts';
+import { log } from './logger.js';
 
 export function getPackageName(): string | undefined {
   const pid = Process.id;

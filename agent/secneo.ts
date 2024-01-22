@@ -1,7 +1,7 @@
-import { log } from './logger.ts';
-import { Stack } from './stack.ts';
-import { getPackageName, writeDexToFile } from './dex.ts';
-import { NeedleMap } from './needle.ts';
+import { log } from './logger.js';
+import { Stack } from './stack.js';
+import { getPackageName, writeDexToFile } from './dex.js';
+import { NeedleMap } from './needle.js';
 
 const targetLibrary = 'libDexHelper.so';
 const debug = false;

@@ -1,5 +1,5 @@
-import { getPackageName } from './dex.ts';
-import { log } from './logger.ts';
+import { getPackageName } from './dex.js';
+import { log } from './logger.js';
 
 import { WriteStream, createWriteStream } from 'fs';
 

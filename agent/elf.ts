@@ -1,5 +1,5 @@
-import { log } from './logger.ts';
-import { Stack } from './stack.ts';
+import { log } from './logger.js';
+import { Stack } from './stack.js';
 // Script to gather the shared library from disk and also
 // from memory utilizing Frida. After reading the file from
 // disk, it will then compare some sections of the file in

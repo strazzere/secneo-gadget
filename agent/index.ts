@@ -1,11 +1,11 @@
-import { log } from './logger.ts';
-import { Stack } from './stack.ts';
-import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo.ts';
-import { dlopenExtHook } from './jni.ts';
-import { hookCallFunction } from './linker.ts';
-import { antiDebug } from './anti.ts';
-import { getPackageName } from './dex.ts';
-import { processRelevantModules } from './elf.ts';
+import { log } from './logger.js';
+import { Stack } from './stack.js';
+import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo.js';
+import { dlopenExtHook } from './jni.js';
+import { hookCallFunction } from './linker.js';
+import { antiDebug } from './anti.js';
+import { getPackageName } from './dex.js';
+import { processRelevantModules } from './elf.js';
 
 // Oddly this is a string
 const targetedAndroidVersion = '13';

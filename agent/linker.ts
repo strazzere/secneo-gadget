@@ -1,4 +1,4 @@
-import { log } from './logger.ts';
+import { log } from './logger.js';
 
 const debug = false;
 
