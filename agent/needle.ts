@@ -2,6 +2,7 @@ import { getPackageName } from './dex.js';
 import { log } from './logger.js';
 
 import { WriteStream, createWriteStream } from 'fs';
+import { Buffer } from 'node:buffer';
 
 export class NeedleMap {
   needles: number;
