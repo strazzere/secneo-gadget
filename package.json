@@ -23,7 +23,7 @@
   "devDependencies": {
     "@types/cli-progress": "^3.11.0",
     "@types/frida-gum": "^18.5.1",
-    "@types/node": "~20.8",
+    "@types/node": "~20.9",
     "@typescript-eslint/eslint-plugin": "^7.3.0",
     "eslint": "^8.24.0",
     "eslint-config-prettier": "^9.1.0",
