@@ -10,7 +10,7 @@ import cliProgress from 'cli-progress';
 // 00000060  70 1a 00 00 6c 4f 12 00  38 b8 71 00 9c 9d 15 00  |p...lO..8.q.....|
 
 function isDex(buffer: Buffer): boolean {
-  if (Buffer.compare(buffer.slice(0, 8), Buffer.from('dex\n037\x00')) !== 0) {
+  if (Buffer.compare(buffer.subarray(0, 8), Buffer.from('dex\n037\x00')) !== 0) {
     return false;
   }
 
@@ -31,7 +31,7 @@ type DataSegment = {
 function getDataSegment(buffer: Buffer): DataSegment {
   if (!isDex(buffer)) {
     throw new Error(
-      `Buffer provided does not appear to be a DEX file : [${buffer.slice(0, 8).toString('hex')}]`,
+      `Buffer provided does not appear to be a DEX file : [${buffer.subarray(0, 8).toString('hex')}]`,
     );
   }
 
@@ -74,7 +74,7 @@ function writeDexFile(file: File): string {
 async function main() {
   console.log(`[*] SecNeo Stolen Bytecode Rebuilder\n`);
 
-  const directory = './dumped';
+  const directory = './dumped/pilot/2.5.1.15/dumped';
   const bytecodeData = JSON.parse(fs.readFileSync(`${directory}/data.json`, 'utf-8'));
 
   if (!bytecodeData && bytecodeData.length <= 0) {
@@ -128,14 +128,16 @@ async function main() {
   //    `unpacked_0xb400007038e24fdc_4647a0.dex`,
   //    `unpacked_0xb400007038ba1fdc_282fc0.dex`,
   //
-  const dexToSkip: string[] = [
-    'unpacked_0xb400006e97441ff0_45c21c.dex',
-    'unpacked_0xb400006e9789eff0_33b3ac.dex',
-    'unpacked_0xb400006e97bdaff0_2776d8.dex',
-    'unpacked_0xb400006e97e52ff0_443c3c.dex',
-    'unpacked_0xb400006e98296ff0_1a3918.dex',
-    'unpacked_0xb400006e9843aff0_1e2148.dex',
-  ];
+
+  // Specific to 1.9 dump
+  // 'unpacked_0xb400006e97441ff0_45c21c.dex',
+  // 'unpacked_0xb400006e9789eff0_33b3ac.dex',
+  // 'unpacked_0xb400006e97bdaff0_2776d8.dex',
+  // 'unpacked_0xb400006e97e52ff0_443c3c.dex',
+  // 'unpacked_0xb400006e98296ff0_1a3918.dex',
+  // 'unpacked_0xb400006e9843aff0_1e2148.dex',
+
+  const dexToSkip: string[] = [];
 
   const dexFiles = fs
     .readdirSync(directory)

@@ -99,7 +99,7 @@ function connectHook() {
         if (memory) {
           const buffer = new Uint8Array(memory);
           const fridaPort = new Uint8Array(Buffer.from('69a27f000001', 'hex'));
-          if (Buffer.compare(buffer.slice(2, 7), fridaPort) === 0) {
+          if (Buffer.compare(buffer.subarray(2, 7), fridaPort) === 0) {
             this.fridaDetection = true;
             log(` [!] connect : app is attempting to detect frida`);
             log(Stack.native(this.context));
