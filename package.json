@@ -14,20 +14,17 @@
     "prepare": "npm run build",
     "build": "frida-compile agent/index.ts -o build/_agent.js -c && tsc",
     "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
-    "lint": "npx eslint research/jdwp/*.ts src/*.ts agent/*.ts",
+    "lint": "npx @biomejs/biome check --write ./src",
     "start": "npm run prepare && node build/index.js",
     "spawn": "frida -U -f dji.go.v5 -l build/_agent.js",
     "spawn-pilot": "frida -U -f com.dji.industry.pilot -l build/_agent.js",
     "combine": "tsc && node build/combine.js"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.8.3",
     "@types/cli-progress": "^3.11.0",
     "@types/frida-gum": "^18.5.1",
     "@types/node": "~20.9",
-    "@typescript-eslint/eslint-plugin": "^7.3.0",
-    "eslint": "^8.24.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.1.3",
     "frida-compile": "^16.4.1",
     "typescript": "^5.3.3"
   },

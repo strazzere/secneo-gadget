@@ -1,5 +1,5 @@
-import net from 'net';
-import { exec } from 'child_process';
+import { exec } from "node:child_process";
+import net from "node:net";
 
 const jdwpPort = 8200;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -23,18 +23,18 @@ export async function forwardJdwpPort(pid: number) {
 }
 
 export async function triggerJdbConnect() {
-  const jdb = net.connect({ host: 'localhost', port: jdwpPort });
+  const jdb = net.connect({ host: "localhost", port: jdwpPort });
 
   // jdb.on('data', (data: Buffer) => {
   //   console.log(`data <= ${data.toString('hex')}`);
   // });
 
-  jdb.write(Buffer.from('4a4457502d48616e647368616b65', 'hex'));
+  jdb.write(Buffer.from("4a4457502d48616e647368616b65", "hex"));
   await delay(100);
-  jdb.write(Buffer.from('0000000b00000001000107', 'hex'));
+  jdb.write(Buffer.from("0000000b00000001000107", "hex"));
   await delay(100);
-  jdb.write(Buffer.from('0000001100000003000f01080000000000', 'hex'));
+  jdb.write(Buffer.from("0000001100000003000f01080000000000", "hex"));
   await delay(100);
-  jdb.write(Buffer.from('0000001100000005000f01090000000000', 'hex'));
+  jdb.write(Buffer.from("0000001100000005000f01090000000000", "hex"));
   await delay(100);
 }

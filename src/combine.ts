@@ -1,5 +1,5 @@
-import fs from 'fs';
-import cliProgress from 'cli-progress';
+import fs from "node:fs";
+import cliProgress from "cli-progress";
 
 // 00000000  64 65 78 0a 30 33 37 00  d9 46 30 17 6c 32 ed 82  |dex.037..F0.l2..|
 // 00000010  5d 65 ec 24 8b fb fe 96  82 08 8d 77 21 76 31 06  |]e.$.......w!v1.|
@@ -10,7 +10,9 @@ import cliProgress from 'cli-progress';
 // 00000060  70 1a 00 00 6c 4f 12 00  38 b8 71 00 9c 9d 15 00  |p...lO..8.q.....|
 
 function isDex(buffer: Buffer): boolean {
-  if (Buffer.compare(buffer.subarray(0, 8), Buffer.from('dex\n037\x00')) !== 0) {
+  if (
+    Buffer.compare(buffer.subarray(0, 8), Buffer.from("dex\n037\x00")) !== 0
+  ) {
     return false;
   }
 
@@ -31,7 +33,7 @@ type DataSegment = {
 function getDataSegment(buffer: Buffer): DataSegment {
   if (!isDex(buffer)) {
     throw new Error(
-      `Buffer provided does not appear to be a DEX file : [${buffer.subarray(0, 8).toString('hex')}]`,
+      `Buffer provided does not appear to be a DEX file : [${buffer.subarray(0, 8).toString("hex")}]`,
     );
   }
 
@@ -40,7 +42,7 @@ function getDataSegment(buffer: Buffer): DataSegment {
 
   if (dataOffset + dataSize > buffer.length) {
     throw new Error(
-      `Buffer provided does not appear to be a valid DEX file, data segment would extend past end of buffer`,
+      "Buffer provided does not appear to be a valid DEX file, data segment would extend past end of buffer",
     );
   }
 
@@ -72,19 +74,21 @@ function writeDexFile(file: File): string {
 }
 
 async function main() {
-  console.log(`[*] SecNeo Stolen Bytecode Rebuilder\n`);
+  console.log("[*] SecNeo Stolen Bytecode Rebuilder\n");
 
-  const directory = './dumped/pilot/2.5.1.15/dumped';
-  const bytecodeData = JSON.parse(fs.readFileSync(`${directory}/data.json`, 'utf-8'));
+  const directory = "./dumped/pilot/2.5.1.15/dumped";
+  const bytecodeData = JSON.parse(
+    fs.readFileSync(`${directory}/data.json`, "utf-8"),
+  );
 
   if (!bytecodeData && bytecodeData.length <= 0) {
-    throw new Error(`Unable to find any bytecode data to replace`);
+    throw new Error("Unable to find any bytecode data to replace");
   }
 
   const decryptedCodes: string[] = [];
   const needles: string[] = [];
 
-  console.time(` [!] Removed duplicates and unneeded functions`);
+  console.time(" [!] Removed duplicates and unneeded functions");
   for (let i = 0; i < bytecodeData.length; i++) {
     if (bytecodeData[i]?.needle !== bytecodeData[i]?.data)
       if (
@@ -98,13 +102,13 @@ async function main() {
         needles.push(bytecodeData[i].needle);
       }
   }
-  console.timeEnd(` [!] Removed duplicates and unneeded functions`);
+  console.timeEnd(" [!] Removed duplicates and unneeded functions");
   const itemsRemoved = bytecodeData.length - decryptedCodes.length;
   console.log(
     ` [+] Dex methods to recover: ${decryptedCodes.length} ${
       itemsRemoved > 0
-        ? `(${itemsRemoved} unneeded method${itemsRemoved > 1 ? 's removed' : ' removed'})`
-        : ''
+        ? `(${itemsRemoved} unneeded method${itemsRemoved > 1 ? "s removed" : " removed"})`
+        : ""
     }`,
   );
   const saveDeduped = true;
@@ -114,7 +118,7 @@ async function main() {
       deduped.push({ needle: needles[i], data: decryptedCodes[i] });
     }
 
-    fs.writeFileSync(`./deduped.json`, JSON.stringify(deduped));
+    fs.writeFileSync("./deduped.json", JSON.stringify(deduped));
   }
 
   // Would be more interesting if we could dynamically type that these don't have issues
@@ -141,27 +145,30 @@ async function main() {
 
   const dexFiles = fs
     .readdirSync(directory)
-    .filter((file) => file.endsWith('.dex'))
+    .filter((file) => file.endsWith(".dex"))
     .filter((file) => !dexToSkip.includes(file))
     .map((file) => readDexFile(`${directory}/${file}`));
 
   console.log(` [+] Read in ${dexFiles.length} dex files`);
 
-  const progress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+  const progress = new cliProgress.SingleBar(
+    {},
+    cliProgress.Presets.shades_classic,
+  );
 
   progress.start(decryptedCodes.length, 0);
-  console.time(' [+] Function Matching');
+  console.time(" [+] Function Matching");
   const matched: string[] = [];
   const unmatched: string[] = [];
 
   // This is actually faster over the long run than using a forEach
   for (let i = 0; i < decryptedCodes.length; i++) {
-    const needle = Buffer.from(needles[i], 'hex');
+    const needle = Buffer.from(needles[i], "hex");
     let written = false;
     for (let x = 0; x < dexFiles.length; x++) {
       const index = dexFiles[x].dataSegment.buffer.indexOf(needle);
       if (index !== -1) {
-        const codeBuffer = Buffer.from(decryptedCodes[i], 'hex');
+        const codeBuffer = Buffer.from(decryptedCodes[i], "hex");
         dexFiles[x].dataSegment.hits++;
         codeBuffer.copy(dexFiles[x].dataSegment.buffer, index);
         written = true;
@@ -178,19 +185,19 @@ async function main() {
   }
 
   progress.stop();
-  console.timeEnd(' [+] Function Matching');
+  console.timeEnd(" [+] Function Matching");
 
   console.log(` [+] Matched : ${matched.length}`);
-  fs.writeFileSync(`${directory}/matched.out`, matched.join('\n'));
+  fs.writeFileSync(`${directory}/matched.out`, matched.join("\n"));
   console.log(` [-] Unmatched : ${unmatched.length}`);
-  fs.writeFileSync(`${directory}/unmatched.out`, unmatched.join('\n'));
+  fs.writeFileSync(`${directory}/unmatched.out`, unmatched.join("\n"));
 
-  dexFiles.forEach((file) => {
+  for (const file of dexFiles) {
     const writtenFile = writeDexFile(file);
     console.log(
       ` [+] Wrote out fixed dex file ${writtenFile} which contained ${file.dataSegment.hits}`,
     );
-  });
+  }
 }
 
 main().catch((e) => {
