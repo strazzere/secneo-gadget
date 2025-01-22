@@ -7,6 +7,7 @@
     "strict": true,
     "outDir": "build",
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "strictPropertyInitialization": false,
     "moduleResolution": "node",
     "declaration": true,

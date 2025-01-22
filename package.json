@@ -24,7 +24,7 @@
     "@biomejs/biome": "^1.8.3",
     "@types/cli-progress": "^3.11.0",
     "@types/frida-gum": "^18.5.1",
-    "@types/node": "~20.9",
+    "@types/node": "^22.10.7",
     "frida-compile": "^16.4.1",
     "typescript": "^5.3.3"
   },
