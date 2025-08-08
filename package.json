@@ -21,7 +21,7 @@
     "combine": "tsc && node build/combine.js"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.8.3",
+    "@biomejs/biome": "^2.1.4",
     "@types/cli-progress": "^3.11.0",
     "@types/frida-gum": "^18.5.1",
     "@types/node": "^22.10.7",
