@@ -1,8 +1,7 @@
-import { getPackageName } from './dex.js';
-import { log } from './logger.js';
-
-import { WriteStream, createWriteStream } from 'fs';
-import { Buffer } from 'node:buffer';
+import { Buffer } from "node:buffer";
+import { createWriteStream, type WriteStream } from "node:fs";
+import { getPackageName } from "./dex.js";
+import { log } from "./logger.js";
 
 export class NeedleMap {
   needles: number;
@@ -15,7 +14,7 @@ export class NeedleMap {
     this.needles = 0;
 
     this.outputStream = createWriteStream(this.fileName);
-    this.outputStream.write('[\n\t');
+    this.outputStream.write("[\n\t");
   }
 
   isOpen(): boolean {
@@ -26,9 +25,11 @@ export class NeedleMap {
     if (!this.outputStream) {
       throw new Error(`Outputstream already closed`);
     }
-    log(`Closing needle writer after writing ${this.needles} to ${this.fileName}`);
+    log(
+      `Closing needle writer after writing ${this.needles} to ${this.fileName}`,
+    );
 
-    this.outputStream.write('\n]');
+    this.outputStream.write("\n]");
 
     // Close out the stream and set it to undefined so we don't mistakenly write more
     this.outputStream.end();
@@ -40,13 +41,15 @@ export class NeedleMap {
       throw new Error(`Outputstream already closed`);
     }
     if (this.needles > 0) {
-      this.outputStream.write(',\n\t');
+      this.outputStream.write(",\n\t");
     }
     this.needles++;
 
-    const needleString = `{ "needle": "${Buffer.from(new Uint8Array(needleData)).toString(
-      'hex',
-    )}", "data" : "${Buffer.from(new Uint8Array(data)).toString('hex')}" }`;
+    const needleString = `{ "needle": "${Buffer.from(
+      new Uint8Array(needleData),
+    ).toString(
+      "hex",
+    )}", "data" : "${Buffer.from(new Uint8Array(data)).toString("hex")}" }`;
 
     this.outputStream.write(needleString);
   }

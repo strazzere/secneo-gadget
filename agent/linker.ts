@@ -1,4 +1,4 @@
-import { log } from './logger.js';
+import { log } from "./logger.js";
 
 const debug = false;
 
@@ -9,9 +9,13 @@ const debug = false;
  */
 export function hookCallFunction(
   targetLibrary: string,
-  callback?: (context: CpuContext, functionName: string, pointer: NativePointer) => void,
+  callback?: (
+    context: CpuContext,
+    functionName: string,
+    pointer: NativePointer,
+  ) => void,
 ): boolean {
-  const linkerModuleName = Process.pointerSize === 4 ? 'linker' : 'linker64';
+  const linkerModuleName = Process.pointerSize === 4 ? "linker" : "linker64";
   const linker = Process.findModuleByName(linkerModuleName);
 
   if (!linker) {
@@ -31,7 +35,7 @@ export function hookCallFunction(
   //                        const char* realpath __unused)
   // https://cs.android.com/android/platform/superproject/+/master:bionic/linker/linker_soinfo.cpp;l=475;bpv=1
   return linker.enumerateSymbols().some((symbol) => {
-    if (symbol.name.indexOf('call_function') >= 0) {
+    if (symbol.name.indexOf("call_function") >= 0) {
       if (debug) {
         log(`Found function to hook which is symbol ${JSON.stringify(symbol)}`);
       }
@@ -50,7 +54,11 @@ export function hookCallFunction(
 function hookFunction(
   targetLibrary: string,
   address: NativePointer,
-  callback?: (context: CpuContext, functionName: string, pointer: NativePointer) => void,
+  callback?: (
+    context: CpuContext,
+    functionName: string,
+    pointer: NativePointer,
+  ) => void,
 ): boolean {
   if (!address) {
     return false;
@@ -62,14 +70,20 @@ function hookFunction(
       const functionAddress = args[1];
       const realPath = args[2].readCString();
       if (realPath && realPath.indexOf(targetLibrary) >= 0) {
-        const moduleAddress = Module.findBaseAddress(targetLibrary);
-        const truePointer = functionAddress.sub(moduleAddress ? moduleAddress : 0x0).sub(0x1);
+        const moduleAddress = Process.findModuleByName(targetLibrary)?.base;
+        const truePointer = functionAddress
+          .sub(moduleAddress ? moduleAddress : 0x0)
+          .sub(0x1);
         if (debug) {
           log(
             `[call_function name: ${functionName}, offset: ${truePointer}, realpath : ${realPath}`,
           );
         }
-        callback?.(this.context, functionName ? functionName : 'NO_NAME', truePointer);
+        callback?.(
+          this.context,
+          functionName ? functionName : "NO_NAME",
+          truePointer,
+        );
       }
     },
   });

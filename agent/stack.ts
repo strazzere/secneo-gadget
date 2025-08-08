@@ -1,3 +1,5 @@
+import Java from "frida-java-bridge";
+
 /**
  * Helper class for getting stack traces and backtraces.
  */
@@ -6,10 +8,12 @@ export class Stack {
 
   constructor() {
     if (!Java.available) {
-      throw new Error(`Unable to initialize a Java stacktrace object when Java is unavailable`);
+      throw new Error(
+        `Unable to initialize a Java stacktrace object when Java is unavailable`,
+      );
     }
     Java.perform(() => {
-      const ThreadDef = Java.use('java.lang.Thread');
+      const ThreadDef = Java.use("java.lang.Thread");
       this.threadObj = ThreadDef.$new();
     });
   }
@@ -21,14 +25,16 @@ export class Stack {
     if (!this.threadObj) {
       throw new Error(`No java stack available as no thread object available`);
     }
-    let stackString = '';
+    let stackString = "";
     this.threadObj
       .currentThread()
       .getStackTrace()
       .map((stackLayer: string, index: number) => {
         // Ignore our own creations on the stack (getStackStrace/getThreadStackTrace)
         if (index > 1) {
-          stackString = stackString.concat(`${index - 1} => ${stackLayer.toString()}\n`);
+          stackString = stackString.concat(
+            `${index - 1} => ${stackLayer.toString()}\n`,
+          );
         }
       });
 
@@ -40,9 +46,9 @@ export class Stack {
    * @returns string of backtrace
    */
   static native(context: CpuContext) {
-    return (
-      Thread.backtrace(context, Backtracer.ACCURATE).map(DebugSymbol.fromAddress).join('\n') + '\n'
-    );
+    return `${Thread.backtrace(context, Backtracer.ACCURATE)
+      .map(DebugSymbol.fromAddress)
+      .join("\n")}\n`;
   }
 
   /**
@@ -80,25 +86,27 @@ export class Stack {
     // ]
     const builtSymbol = {
       base: ptr(0x0),
-      moduleName: '',
-      path: '',
+      moduleName: "",
+      path: "",
       size: 0,
     };
-    let ranges = Process.enumerateRanges('').filter(
+    let ranges = Process.enumerateRanges("").filter(
       (range) => range.base <= pointer && range.base.add(range.size) >= pointer,
     );
     ranges.forEach((range) => {
       if (range.file) {
         builtSymbol.path = range.file.path;
-        const moduleNameChunks = range.file.path.split('/');
+        const moduleNameChunks = range.file.path.split("/");
         builtSymbol.moduleName = moduleNameChunks[moduleNameChunks.length - 1];
 
         builtSymbol.base = range.base.sub(range.file.offset);
       }
     });
 
-    ranges = Process.enumerateRanges('').filter(
-      (range) => range.base <= builtSymbol.base && range.base.add(range.size) >= builtSymbol.base,
+    ranges = Process.enumerateRanges("").filter(
+      (range) =>
+        range.base <= builtSymbol.base &&
+        range.base.add(range.size) >= builtSymbol.base,
     );
     ranges.forEach((range) => {
       if (builtSymbol.base === ptr(0x0) || builtSymbol.base < range.base) {

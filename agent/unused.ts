@@ -1,7 +1,10 @@
-import { log } from './logger';
-import { Stack } from './stack';
+import { log } from "./logger";
+import { Stack } from "./stack";
 
-const systemPropertyGetPtr = Module.findExportByName(null, '__system_property_get');
+const systemPropertyGetPtr = Module.findExportByName(
+  null,
+  "__system_property_get",
+);
 if (systemPropertyGetPtr) {
   Interceptor.attach(systemPropertyGetPtr, {
     onEnter: function (args) {
@@ -13,14 +16,16 @@ if (systemPropertyGetPtr) {
       }
     },
     onLeave: function (retval) {
-      log(`__system_property_get("${this.name}", value=${this.value} ) : ${retval}`);
+      log(
+        `__system_property_get("${this.name}", value=${this.value} ) : ${retval}`,
+      );
     },
   });
 }
 
 // Can only be hooked after dex helper is unpacked
-const dexBase = Module.findBaseAddress('libDexHelper.so');
-const xorStuff = Module.findBaseAddress('libDexHelper.so')?.add(0x18220);
+const dexBase = Module.findBaseAddress("libDexHelper.so");
+const xorStuff = Module.findBaseAddress("libDexHelper.so")?.add(0x18220);
 if (xorStuff) {
   Interceptor.attach(xorStuff, {
     onEnter: function (args) {
@@ -36,10 +41,10 @@ if (xorStuff) {
   });
 }
 
-const openPtr = Module.findExportByName(null, 'open');
+const openPtr = Module.findExportByName(null, "open");
 if (openPtr) {
   Interceptor.attach(openPtr, {
-    onEnter: function (args) {
+    onEnter: (args) => {
       const fileName = args[0].readUtf8String();
       log(`[*] open - ${fileName}`);
     },
@@ -58,12 +63,12 @@ if (openPtr) {
 // LOAD:000000000003B498                 BL              .memcmp
 // hook the above specific call to .memcmp and inspect the contents
 // this is likely the md5 (?) check against the original classes.dex for integrity check, I think?
-const memcmp = Module.findBaseAddress('libDexHelper.so')?.add(0x0003b498);
+const memcmp = Module.findBaseAddress("libDexHelper.so")?.add(0x0003b498);
 if (memcmp) {
-  log('[*] hooked specific memcmp : ', memcmp);
+  log("[*] hooked specific memcmp : ", memcmp);
   Interceptor.attach(memcmp, {
     onEnter: function (args) {
-      log('specific memcmp');
+      log("specific memcmp");
       console.log(
         hexdump(args[0], {
           offset: 0,
@@ -82,7 +87,7 @@ if (memcmp) {
       );
       log(Stack.native(this.context));
     },
-    onLeave: function (retval) {
+    onLeave: (retval) => {
       log(`memcmp equal ret: ${retval}`);
     },
   });

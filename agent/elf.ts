@@ -1,5 +1,6 @@
-import { log } from './logger.js';
-import { Stack } from './stack.js';
+import { log } from "./logger.js";
+import { Stack } from "./stack.js";
+
 // Script to gather the shared library from disk and also
 // from memory utilizing Frida. After reading the file from
 // disk, it will then compare some sections of the file in
@@ -16,25 +17,27 @@ function getNativeFunction(
   name: string,
   ret: NativeFunctionReturnType,
   args: NativeFunctionArgumentType[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: ignore as there is no typing
 ): NativeFunction<any, any> {
-  const mod = Module.findExportByName(null, name);
+  const mod = Module.findGlobalExportByName(name);
   if (!mod) {
     throw new Error(`Unable to location module ${name}`);
   }
 
   const func = new NativeFunction(mod, ret, args);
-  if (typeof func === 'undefined') {
-    throw Error(`Unable to create the NativeFunction for ${name} using ${ret} and ${args}`);
+  if (typeof func === "undefined") {
+    throw Error(
+      `Unable to create the NativeFunction for ${name} using ${ret} and ${args}`,
+    );
   }
 
   return func;
 }
 
-const openPtr = getNativeFunction('open', 'int', ['pointer', 'int', 'int']);
-const readPtr = getNativeFunction('read', 'int', ['int', 'pointer', 'int']);
-const closePtr = getNativeFunction('close', 'int', ['int']);
-const lseekPtr = getNativeFunction('lseek', 'int', ['int', 'int', 'int']);
+const openPtr = getNativeFunction("open", "int", ["pointer", "int", "int"]);
+const readPtr = getNativeFunction("read", "int", ["int", "pointer", "int"]);
+const closePtr = getNativeFunction("close", "int", ["int"]);
+const lseekPtr = getNativeFunction("lseek", "int", ["int", "int", "int"]);
 
 type Section = {
   name: string;
@@ -73,10 +76,18 @@ function getElfData(module: Module): ElfData | undefined {
   elfData.is32 = is32;
 
   // Parse section headers
-  const sectionHeaderOffset = is32 ? header.add(32).readU32() : header.add(40).readU64().toNumber(); // For some reason this is read as a string
-  const sectionHeaderSize = is32 ? header.add(46).readU16() : header.add(58).readU16();
-  const sectionHeaderCount = is32 ? header.add(48).readU16() : header.add(60).readU16();
-  const sectionHeaderStringTableIndex = is32 ? header.add(50).readU16() : header.add(62).readU16();
+  const sectionHeaderOffset = is32
+    ? header.add(32).readU32()
+    : header.add(40).readU64().toNumber(); // For some reason this is read as a string
+  const sectionHeaderSize = is32
+    ? header.add(46).readU16()
+    : header.add(58).readU16();
+  const sectionHeaderCount = is32
+    ? header.add(48).readU16()
+    : header.add(60).readU16();
+  const sectionHeaderStringTableIndex = is32
+    ? header.add(50).readU16()
+    : header.add(62).readU16();
 
   const sectionHeaders = Memory.alloc(sectionHeaderSize * sectionHeaderCount);
 
@@ -84,13 +95,17 @@ function getElfData(module: Module): ElfData | undefined {
   readPtr(fd, sectionHeaders, sectionHeaderSize * sectionHeaderCount);
 
   const stringTableOffset = is32
-    ? sectionHeaders.add(sectionHeaderSize * sectionHeaderStringTableIndex + 16).readU32()
+    ? sectionHeaders
+        .add(sectionHeaderSize * sectionHeaderStringTableIndex + 16)
+        .readU32()
     : sectionHeaders
         .add(sectionHeaderSize * sectionHeaderStringTableIndex + 24)
         .readU64()
         .toNumber();
   const stringTableSize = is32
-    ? sectionHeaders.add(sectionHeaderSize * sectionHeaderStringTableIndex + 20).readU32()
+    ? sectionHeaders
+        .add(sectionHeaderSize * sectionHeaderStringTableIndex + 20)
+        .readU32()
     : sectionHeaders
         .add(sectionHeaderSize * sectionHeaderStringTableIndex + 32)
         .readU64()
@@ -105,7 +120,7 @@ function getElfData(module: Module): ElfData | undefined {
       .add(sectionHeaders.add(i * sectionHeaderSize).readU32())
       .readUtf8String();
     if (!sectionName) {
-      sectionName = 'unknown';
+      sectionName = "unknown";
     }
     const sectionAddress = is32
       ? sectionHeaders.add(i * sectionHeaderSize + 12).readU32()
@@ -144,14 +159,20 @@ function getElfData(module: Module): ElfData | undefined {
     elfData.sections.push(section);
   }
 
-  const dynsym = elfData.sections.filter((section) => section.name === '.dynsym')[0];
-  const dynstr = elfData.sections.filter((section) => section.name === '.dynstr')[0];
+  const dynsym = elfData.sections.filter(
+    (section) => section.name === ".dynsym",
+  )[0];
+  const dynstr = elfData.sections.filter(
+    (section) => section.name === ".dynstr",
+  )[0];
 
   if (dynsym && dynstr) {
     const stringTable = module.base.add(dynstr.memoryOffset);
     const structSize = is32 ? 16 : 24;
     for (let i = 0; i < dynsym.size / structSize; i++) {
-      const symbolOffset = module.base.add(dynsym.memoryOffset + structSize * i).readU32();
+      const symbolOffset = module.base
+        .add(dynsym.memoryOffset + structSize * i)
+        .readU32();
       const symbolString = stringTable.add(symbolOffset).readUtf8String();
       if (symbolString) {
         elfData.symbols.push(symbolString);
@@ -159,23 +180,29 @@ function getElfData(module: Module): ElfData | undefined {
     }
   }
 
-  const reldyn = elfData.sections.filter((section) => section.name === '.reldyn')[0];
+  const reldyn = elfData.sections.filter(
+    (section) => section.name === ".reldyn",
+  )[0];
   elfData.relmap = new Map();
   if (reldyn) {
     for (let i = 0; i < reldyn.size / 8; i++) {
       const key = module.base.add(reldyn.memoryOffset + i * 8).readU32();
-      const value = module.base.add(reldyn.memoryOffset + i * 8 + 4).readU32() >> 8;
+      const value =
+        module.base.add(reldyn.memoryOffset + i * 8 + 4).readU32() >> 8;
       if (key !== 0 && value !== 0) {
         elfData.relmap.set(key, value);
       }
     }
   }
 
-  const relplt = elfData.sections.filter((section) => section.name === '.relplt')[0];
+  const relplt = elfData.sections.filter(
+    (section) => section.name === ".relplt",
+  )[0];
   if (relplt) {
     for (let i = 0; i < relplt.size / 8; i++) {
       const key = module.base.add(relplt.memoryOffset + i * 8).readU32();
-      const value = module.base.add(relplt.memoryOffset + i * 8 + 4).readU32() >> 8;
+      const value =
+        module.base.add(relplt.memoryOffset + i * 8 + 4).readU32() >> 8;
       if (key !== 0 && value !== 0) {
         elfData.relmap.set(key, value);
       }
@@ -192,11 +219,15 @@ export function findHooks(module: Module) {
   }
 
   const hookableSections = elfData.sections.filter((section) =>
-    ['.rodata', '.text'].includes(section.name),
+    [".rodata", ".text"].includes(section.name),
   );
 
   hookableSections.forEach((section) => {
-    if (section === undefined || section.data === undefined || section.size === 0) {
+    if (
+      section === undefined ||
+      section.data === undefined ||
+      section.size === 0
+    ) {
       return;
     }
 
@@ -206,7 +237,9 @@ export function findHooks(module: Module) {
       return;
     }
     const file = new Uint8Array(sectionBuffer);
-    const memoryBuffer = module.base.add(section.memoryOffset).readByteArray(section.size);
+    const memoryBuffer = module.base
+      .add(section.memoryOffset)
+      .readByteArray(section.size);
     if (!memoryBuffer) {
       return;
     }
@@ -226,9 +259,11 @@ export function findHooks(module: Module) {
             const instruction = Instruction.parse(
               module.base.add(section.memoryOffset).add(start),
             ) as Arm64Instruction;
-            log(`[!] Potential variance found that is ${end - start} bytes long;`);
+            log(
+              `[!] Potential variance found that is ${end - start} bytes long;`,
+            );
 
-            if (['ldr'].includes(instruction.mnemonic)) {
+            if (["ldr"].includes(instruction.mnemonic)) {
               const trampoline = new NativePointer(
                 instruction.operands[1].value as number,
               ).readPointer();
@@ -238,7 +273,9 @@ export function findHooks(module: Module) {
                 )} => ${Stack.getModuleInfo(trampoline)}`,
               );
             } else {
-              log(`${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} `);
+              log(
+                `${DebugSymbol.fromAddress(module.base.add(section.memoryOffset).add(start))} `,
+              );
             }
 
             const instruction2 = Instruction.parse(instruction.next);
@@ -254,8 +291,8 @@ export function findHooks(module: Module) {
                 ansi: true,
               }),
             );
-          } catch (error) {
-            log('Unable to parse instructions');
+          } catch (_error) {
+            log("Unable to parse instructions");
           }
           start = -1;
         }
@@ -267,10 +304,10 @@ export function findHooks(module: Module) {
 // Quick and simple way to get the package name, assumes that the script
 // was injected into an APK otherwise it won't work.
 function getPackageName() {
-  const cmdLine = Memory.allocUtf8String('/proc/self/cmdline');
+  const cmdLine = Memory.allocUtf8String("/proc/self/cmdline");
   const fd = openPtr(cmdLine, 0 /* O_RDONLY */, 0);
   if (fd === -1) {
-    return 'null';
+    return "null";
   }
 
   const buffer = Memory.alloc(32);
@@ -294,7 +331,9 @@ function getRelevantModules() {
   const packageName = getPackageName();
 
   if (!packageName) {
-    throw Error(`Unable to get package name, cannot determine what is relevant`);
+    throw Error(
+      `Unable to get package name, cannot determine what is relevant`,
+    );
   }
 
   return Process.enumerateModules().reduce((relevant, module) => {

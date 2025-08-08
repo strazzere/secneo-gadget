@@ -1,8 +1,8 @@
 import { exec } from "node:child_process";
 import fs from "node:fs";
 import repl from "node:repl";
+import type { Script } from "frida";
 import frida, { type Application } from "frida";
-import type { Script } from "frida/dist/script";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

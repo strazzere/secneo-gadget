@@ -1,5 +1,6 @@
-import { log } from './logger.js';
-import { Stack } from './stack.js';
+import Java from "frida-java-bridge";
+import { log } from "./logger.js";
+import { Stack } from "./stack.js";
 
 const debug = true;
 
@@ -36,14 +37,19 @@ function javaHooks() {
 }
 
 function javaLoadLibrary() {
-  const System = Java.use('java.lang.System');
-  const Runtime = Java.use('java.lang.Runtime');
-  const VMStack = Java.use('dalvik.system.VMStack');
+  const System = Java.use("java.lang.System");
+  const Runtime = Java.use("java.lang.Runtime");
+  const VMStack = Java.use("dalvik.system.VMStack");
 
-  System.loadLibrary.overload('java.lang.String').implementation = function (library: string) {
+  System.loadLibrary.overload("java.lang.String").implementation = (
+    library: string,
+  ) => {
     log(` [+] java.lang.System.loadLibrary(${library})`);
     try {
-      const loaded = Runtime.getRuntime().loadLibrary0(VMStack.getCallingClassLoader(), library);
+      const loaded = Runtime.getRuntime().loadLibrary0(
+        VMStack.getCallingClassLoader(),
+        library,
+      );
       return loaded;
     } catch (ex) {
       console.log(ex);
@@ -52,43 +58,44 @@ function javaLoadLibrary() {
 }
 
 function javaSystemExit() {
-  const system = Java.use('java.lang.System');
-  system.exit.overload('int').implementation = function (pid: number) {
+  const system = Java.use("java.lang.System");
+  system.exit.overload("int").implementation = (pid: number) => {
     log(` [!] java.lang.System.exit(${pid})`);
     getStack();
   };
 }
 
 function javaProcessKill() {
-  const process = Java.use('android.os.Process');
-  process.killProcess.overload('int').implementation = function (pid: number) {
+  const process = Java.use("android.os.Process");
+  process.killProcess.overload("int").implementation = (pid: number) => {
     log(` [!] android.os.Process.KillProcess(${pid})`);
     getStack();
   };
 }
 
 function javaActivityFinish() {
-  const activity = Java.use('android.app.Activity');
-  activity.finishActivity.overload('int').implementation = function () {
+  const activity = Java.use("android.app.Activity");
+  activity.finishActivity.overload("int").implementation = () => {
     log(` [!] android.app.Activity.FinishActivity()`);
   };
 }
 
 function javaActivityDestroy() {
-  Java.choose('android.app.Activity', {
-    onMatch: function (instance) {
-      instance.onDestroy.overload().implementation = function () {
+  Java.choose("android.app.Activity", {
+    onMatch: (instance) => {
+      instance.onDestroy.overload().implementation = () => {
         log(` [!] android.app.Activity.onDestroy()`);
       };
     },
-    onComplete: function () {
+    onComplete: () => {
       // needed?
     },
   });
 }
 
 function connectHook() {
-  const connectPtr = Module.findExportByName('libc.so', 'connect');
+  const connectPtr =
+    Process.findModuleByName("libc.so")?.findExportByName("connect");
   if (connectPtr) {
     if (debug) {
       log(` [+] antidebug : connect anti frida hooked @ ${connectPtr}`);
@@ -98,7 +105,7 @@ function connectHook() {
         const memory = args[1].readByteArray(64);
         if (memory) {
           const buffer = new Uint8Array(memory);
-          const fridaPort = new Uint8Array(Buffer.from('69a27f000001', 'hex'));
+          const fridaPort = new Uint8Array(Buffer.from("69a27f000001", "hex"));
           if (Buffer.compare(buffer.subarray(2, 7), fridaPort) === 0) {
             this.fridaDetection = true;
             log(` [!] connect : app is attempting to detect frida`);
@@ -111,7 +118,7 @@ function connectHook() {
       onLeave: function (retval) {
         if (this.fridaDetection) {
           retval.replace(ptr(-1));
-          log(' [!] frida detection Bypassed');
+          log(" [!] frida detection Bypassed");
         }
       },
     });
@@ -119,7 +126,7 @@ function connectHook() {
 }
 
 function _unlinkHook() {
-  const unlinkPtr = Module.findExportByName(null, 'unlink');
+  const unlinkPtr = Module.findGlobalExportByName("unlink");
   if (unlinkPtr) {
     if (debug) {
       log(` [+] antidebug : unlink hooked @ ${unlinkPtr}`);
@@ -134,7 +141,7 @@ function _unlinkHook() {
 }
 
 function exitHook() {
-  const exitPtr = Module.getExportByName(null, 'exit');
+  const exitPtr = Module.findGlobalExportByName("exit");
   if (exitPtr) {
     if (debug) {
       log(` [+] antidebug : exit hooked @ ${exitPtr}`);
@@ -149,13 +156,13 @@ function exitHook() {
 }
 
 function forkHook() {
-  const forkPtr = Module.findExportByName(null, 'fork');
+  const forkPtr = Module.findGlobalExportByName("fork");
   if (forkPtr) {
     if (debug) {
       log(` [+] antidebug : fork hooked @ ${forkPtr}`);
     }
     Interceptor.attach(forkPtr, {
-      onLeave: function (retval) {
+      onLeave: (retval) => {
         const pid = parseInt(retval.toString(16), 16);
         log(` [!] fork : child process pid ${pid}`);
       },
@@ -164,13 +171,13 @@ function forkHook() {
 }
 
 function ptraceHook() {
-  const ptracePtr = Module.findExportByName(null, 'ptrace');
+  const ptracePtr = Module.findGlobalExportByName("ptrace");
   if (ptracePtr) {
     if (debug) {
       log(` [+] antidebug : ptrace hooked @ ${ptracePtr}`);
     }
     Interceptor.attach(ptracePtr, {
-      onLeave: function (retval) {
+      onLeave: (retval) => {
         log(` [!] ptrace : asserting to app that ptrace connection worked`);
         retval.replace(ptr(0));
       },
@@ -179,20 +186,29 @@ function ptraceHook() {
 }
 
 function tracerHook() {
-  const fgetsPtr = Module.findExportByName('libc.so', 'fgets');
+  const fgetsPtr =
+    Process.findModuleByName("libc.so")?.findExportByName("fgets");
   if (fgetsPtr) {
     if (debug) {
       log(` [+] antidebug : tracer hooking fgets @ ${fgetsPtr}`);
     }
-    const fgets = new NativeFunction(fgetsPtr, 'pointer', ['pointer', 'int', 'pointer']);
+    const fgets = new NativeFunction(fgetsPtr, "pointer", [
+      "pointer",
+      "int",
+      "pointer",
+    ]);
     Interceptor.replace(
       fgetsPtr,
       new NativeCallback(
         function (stream, size, fp) {
           const retval = fgets(stream, size, fp);
           const str = stream.readUtf8String();
-          if (str && str !== 'TracerPid:\t0\n' && str.indexOf('TracerPid:') > -1) {
-            stream.writeUtf8String('TracerPid:\t0\n');
+          if (
+            str &&
+            str !== "TracerPid:\t0\n" &&
+            str.indexOf("TracerPid:") > -1
+          ) {
+            stream.writeUtf8String("TracerPid:\t0\n");
             log(
               ` [!] tracer : changing fgets buffer to have no tracer pid from ${Stack.getModuleInfo(
                 this.returnAddress,
@@ -201,15 +217,15 @@ function tracerHook() {
           }
           return retval;
         },
-        'pointer',
-        ['pointer', 'int', 'pointer'],
+        "pointer",
+        ["pointer", "int", "pointer"],
       ),
     );
   }
 }
 
 function hookKill() {
-  const killPtr = Module.findExportByName(null, 'kill');
+  const killPtr = Module.findGlobalExportByName("kill");
   if (killPtr) {
     if (debug) {
       log(` [+] antidebug : kill hooked @ ${killPtr}`);
@@ -217,20 +233,21 @@ function hookKill() {
     Interceptor.replace(
       killPtr,
       new NativeCallback(
-        function (pid, sig) {
+        (pid, sig) => {
           log(`[+] kill : ${pid} with ${sig}`);
           log(`IGNORING KILL`);
           return 0;
         },
-        'int',
-        ['int', 'int'],
+        "int",
+        ["int", "int"],
       ),
     );
   }
 }
 
-function hookAbort() {
-  const abortPtr = Module.findExportByName('libc.so', 'abort');
+function _hookAbort() {
+  const abortPtr =
+    Process.findModuleByName("libc.so")?.findExportByName("abort");
   if (abortPtr) {
     if (debug) {
       log(` [+] antidebug : abort hooked @ ${abortPtr}`);
@@ -239,13 +256,15 @@ function hookAbort() {
       abortPtr,
       new NativeCallback(
         function (status) {
-          log(`[+] abort : ${status} : via ${Stack.getModuleInfo(this.returnAddress)}`);
+          log(
+            `[+] abort : ${status} : via ${Stack.getModuleInfo(this.returnAddress)}`,
+          );
           log(Stack.native(this.context));
           log(`IGNORING ABORT`);
           return 0;
         },
-        'int',
-        ['int'],
+        "int",
+        ["int"],
       ),
     );
   }
@@ -257,7 +276,7 @@ function hookExits() {
 }
 
 function hookExit() {
-  const exitPtr = Module.findExportByName('libc.so', 'exit');
+  const exitPtr = Process.findModuleByName("libc.so")?.findExportByName("exit");
   if (exitPtr) {
     if (debug) {
       log(` [+] antidebug : exit hooked @ ${exitPtr}`);
@@ -265,26 +284,27 @@ function hookExit() {
     Interceptor.replace(
       exitPtr,
       new NativeCallback(
-        function (status) {
+        (status) => {
           log(`[+] exit : ${status}`);
           log(`IGNORING EXIT`);
           return 0;
         },
-        'int',
-        ['int'],
+        "int",
+        ["int"],
       ),
     );
   }
 }
 
 function hook_exit() {
-  const _exitPtr = Module.findExportByName('libc.so', '_exit');
+  const _exitPtr =
+    Process.findModuleByName("libc.so")?.findExportByName("_exit");
   if (_exitPtr) {
     if (debug) {
       log(` [+] antidebug : _exit hooked @ ${_exitPtr}`);
     }
 
-    const _exit = new NativeFunction(_exitPtr, 'int', ['int']);
+    const _exit = new NativeFunction(_exitPtr, "int", ["int"]);
 
     Interceptor.replace(
       _exitPtr,
@@ -296,15 +316,16 @@ function hook_exit() {
           // return 0
           return _exit(status);
         },
-        'int',
-        ['int'],
+        "int",
+        ["int"],
       ),
     );
   }
 }
 
 function hookRaise() {
-  const raisePtr = Module.findExportByName('libc.so', 'raise');
+  const raisePtr =
+    Process.findModuleByName("libc.so")?.findExportByName("raise");
   if (raisePtr) {
     if (debug) {
       log(` [+] antidebug : raise hooked @ ${raisePtr}`);
@@ -318,8 +339,8 @@ function hookRaise() {
           log(Stack.native(this.context));
           return 0;
         },
-        'int',
-        ['int'],
+        "int",
+        ["int"],
       ),
     );
   }

@@ -9,13 +9,14 @@
 // towards this.
 //
 //
-import frida, { type Application } from "frida";
-
-import fs from "node:fs";
-import repl from "node:repl";
 
 import { exec } from "node:child_process";
+
+import fs from "node:fs";
 import net from "node:net";
+import repl from "node:repl";
+import frida, { type Application } from "frida";
+
 // import { MessageType, ErrorMessage } from 'frida/dist/script';
 
 const jdwpPort = 8200;

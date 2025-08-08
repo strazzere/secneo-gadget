@@ -1,4 +1,4 @@
-import { log } from './logger.js';
+import { log } from "./logger.js";
 
 const debug = false;
 
@@ -13,21 +13,21 @@ enum RTLD_FLAGS {
 }
 
 function parseFlags(flags: number) {
-  let ret = '';
+  let ret = "";
   const strings = Object.keys(RTLD_FLAGS);
   const values = Object.values(RTLD_FLAGS);
 
   values.forEach((value, index) => {
     if ((flags & Number(value)) !== 0) {
       if (ret.length > 0) {
-        ret = ret.concat(' | ');
+        ret = ret.concat(" | ");
       }
       ret = ret.concat(strings[index]);
     }
   });
 
-  if (ret === '') {
-    return 'RTLD_LOCAL';
+  if (ret === "") {
+    return "RTLD_LOCAL";
   }
 
   return ret;
@@ -42,7 +42,8 @@ export function dlopenExtHook(
   enterCallback?: (context: CpuContext) => void,
   leaveCallback?: (context: CpuContext) => void,
 ) {
-  const androidDlopenExtPtr = Module.findExportByName(null, 'android_dlopen_ext');
+  const androidDlopenExtPtr =
+    Module.findGlobalExportByName("android_dlopen_ext");
   if (!androidDlopenExtPtr) {
     throw new Error(`Unable to find export for android_dlopen_ext`);
   }
@@ -52,7 +53,9 @@ export function dlopenExtHook(
       this.flags = parseFlags(args[1].toInt32());
     },
     onLeave: function (retval) {
-      log(` [+] androidDlopenExt("${this.library}", ${this.flags}, &dlextinfo) : ${retval}`);
+      log(
+        ` [+] androidDlopenExt("${this.library}", ${this.flags}, &dlextinfo) : ${retval}`,
+      );
       if (this.library.includes(targetLibrary)) {
         // We don't need to keep this listener around once it's been hit on what we want
         listener.detach();
@@ -67,7 +70,8 @@ function hookJniLoad(
   enterCallback?: (context: CpuContext) => void,
   leaveCallback?: (context: CpuContext) => void,
 ): void {
-  const jniLoadPtr = Module.findExportByName(targetLibrary, 'JNI_OnLoad');
+  const jniLoadPtr =
+    Process.getModuleByName(targetLibrary).findExportByName("JNI_OnLoad");
   if (!jniLoadPtr) {
     throw new Error(`No address was found for JNI_OnLoad for ${targetLibrary}`);
   }
@@ -91,16 +95,20 @@ function hookJniLoad(
 // This was a targetted attempt at a different solution, it would not be wise to run
 // them both at the same time?
 // https://cs.android.com/android/platform/superproject/+/master:art/runtime/jni/java_vm_ext.h;l=106?ss=android%2Fplatform%2Fsuperproject
-export function loadNativeLib(targetLibrary: string, callback?: (context: CpuContext) => void) {
-  const loadNativeLibPtr = Module.findExportByName(
-    'libart.so',
-    '_ZN3art9JavaVMExt17LoadNativeLibraryEP7_JNIEnvRKNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEP8_jobjectP7_jclassPS9_',
+export function loadNativeLib(
+  targetLibrary: string,
+  callback?: (context: CpuContext) => void,
+) {
+  const loadNativeLibPtr = Process.getModuleByName(
+    "libart.so",
+  ).findExportByName(
+    "_ZN3art9JavaVMExt17LoadNativeLibraryEP7_JNIEnvRKNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEP8_jobjectP7_jclassPS9_",
   );
   if (!loadNativeLibPtr) {
     throw new Error(`No address was found for LoadNativeLibrary for libart.so`);
   }
   Interceptor.attach(loadNativeLibPtr, {
-    onEnter: function (_args) {
+    onEnter: (_args) => {
       // args[1] is a std::string which contains the library, but this is a bit
       // of an annoyance to parse correctly
       hookJniLoad(targetLibrary, callback);

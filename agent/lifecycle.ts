@@ -1,5 +1,6 @@
-import { log } from './logger';
-import { Stack } from './stack';
+import Java from "frida-java-bridge";
+import { log } from "./logger";
+import { Stack } from "./stack";
 
 const stack = new Stack();
 const getStack = () => {
@@ -14,7 +15,7 @@ export function hookLifeCycles() {
 }
 
 export function hookApplicationStates() {
-  Java.performNow(function () {
+  Java.performNow(() => {
     const application = Java.use(`android.app.Application`);
     application.onCreate.implementation = function () {
       log(` > onCreate called`);
@@ -31,7 +32,7 @@ export function hookApplicationStates() {
 }
 
 export function hookActivityStates() {
-  Java.performNow(function () {
+  Java.performNow(() => {
     const activity = Java.use(`android.app.Activity`);
     activity.onResume.implementation = function () {
       log(` > resume called`);
@@ -45,7 +46,7 @@ export function hookActivityStates() {
       this.onDestroy();
     };
 
-    activity.onCreate.overload('android.os.Bundle').implementation = function (
+    activity.onCreate.overload("android.os.Bundle").implementation = function (
       bundle: Java.Wrapper<object>,
     ) {
       log(` > create called`);

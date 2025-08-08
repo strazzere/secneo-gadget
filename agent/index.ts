@@ -1,14 +1,14 @@
-import { log } from './logger.js';
-import { Stack } from './stack.js';
-import { hookDexHelper, secneoJavaHooks, forceLoadClasses } from './secneo.js';
-import { dlopenExtHook } from './jni.js';
-import { hookCallFunction } from './linker.js';
-import { antiDebug } from './anti.js';
-import { getPackageName } from './dex.js';
-import { processRelevantModules } from './elf.js';
+import Java from "frida-java-bridge";
+import { antiDebug } from "./anti.js";
+import { getPackageName } from "./dex.js";
+import { dlopenExtHook } from "./jni.js";
+import { hookCallFunction } from "./linker.js";
+import { log } from "./logger.js";
+import { forceLoadClasses, hookDexHelper, secneoJavaHooks } from "./secneo.js";
+import { Stack } from "./stack.js";
 
 // Oddly this is a string
-const targetedAndroidVersion = '13';
+const targetedAndroidVersion = "13";
 if (Java.androidVersion !== targetedAndroidVersion) {
   log(
     `Unexpected Android version, this script may not work as expected, targeting ${targetedAndroidVersion} but found ${Java.androidVersion}`,
@@ -21,27 +21,35 @@ log(`Attempting to work inside pid ${Process.id}`);
 
 // To avoid the SIGILL from the openssl, though this doesn't seem to be the primary issue?
 let replaced = false;
-hookCallFunction('libdjibase.so', (_context, _functionName, _pointer) => {
+hookCallFunction("libdjibase.so", (_context, _functionName, _pointer) => {
   if (!replaced) {
-    const OPENSSL_cpuid_setupPtr = Module.findExportByName('libdjibase.so', 'OPENSSL_cpuid_setup');
+    const OPENSSL_cpuid_setupPtr = Process.findModuleByName(
+      "libdjibase.so",
+    )?.findExportByName("OPENSSL_cpuid_setup");
     if (OPENSSL_cpuid_setupPtr) {
       log(` [+] replacing OPENSSL_cpuid_setup @ ${OPENSSL_cpuid_setupPtr}`);
       try {
-        const OPENSSL_cpuid_setup = new NativeFunction(OPENSSL_cpuid_setupPtr, 'void', ['void']);
+        const OPENSSL_cpuid_setup = new NativeFunction(
+          OPENSSL_cpuid_setupPtr,
+          "void",
+          ["void"],
+        );
         Interceptor.replace(
           OPENSSL_cpuid_setup,
           new NativeCallback(
-            function () {
+            () => {
               log(` [*] Skipping OPENSSL_cpuid_setup`);
               Thread.sleep(1);
             },
-            'void',
-            ['void'],
+            "void",
+            ["void"],
           ),
         );
         replaced = true;
-      } catch (error) {
-        log(` [!] Unable to hook this attempt, likely not yet unpacked, will retry`);
+      } catch (_error) {
+        log(
+          ` [!] Unable to hook this attempt, likely not yet unpacked, will retry`,
+        );
       }
     }
   }
@@ -52,7 +60,7 @@ if (!hooked) {
   let packagename = getPackageName();
   if (!packagename) {
     log(` [!] Unable to obtain package name, likely everything will break`);
-    packagename = 'Unknown';
+    packagename = "Unknown";
   }
   log(` [+] Hooking inside the package : ${packagename}`);
 
@@ -66,7 +74,7 @@ if (!hooked) {
       antiDebug();
     }
 
-    if (packagename && !packagename.includes('pilot')) {
+    if (packagename && !packagename.includes("pilot")) {
       secneoJavaHooks();
     }
 
@@ -75,22 +83,22 @@ if (!hooked) {
 
   // Currently the pilot versions we have seen utilize a different version or style of
   // secneo, so we need to attach to the post fork'ed process
-  if (packagename && packagename.includes('pilot')) {
+  if (packagename?.includes("pilot")) {
     hookFunctions(false);
 
     // This is a great way to reveal where the hooking engine is working
     // processRelevantModules();
   } else {
     dlopenExtHook(
-      'libDexHelper.so',
-      function (_context) {
+      "libDexHelper.so",
+      (_context) => {
         send({
-          event: 'dlopenExtHook',
-          detail: 'Hit hook, attempting to set hooks inside lib',
+          event: "dlopenExtHook",
+          detail: "Hit hook, attempting to set hooks inside lib",
         });
         hookFunctions(true);
       },
-      function (_context) {
+      (_context) => {
         // This appears to be too late to call the hook
         // secneoJavaHooks();
       },
@@ -98,17 +106,19 @@ if (!hooked) {
   }
 }
 
-Process.setExceptionHandler(function (d) {
+Process.setExceptionHandler((d) => {
   const clean = Stack.getModuleInfo(d.address);
-  console.log(`Exception caught : ${d} : (pc :${d.context.pc}) : ${d.address} : ${clean}`);
+  console.log(
+    `Exception caught : ${d} : (pc :${d.context.pc}) : ${d.address} : ${clean}`,
+  );
   log(Stack.native(d.context));
 
   return false;
 });
 
-log(`Script ${hooked ? '(Re)l' : 'l'}oaded`);
+log(`Script ${hooked ? "(Re)l" : "l"}oaded`);
 
 send({
-  event: 'loaded',
-  detail: 'Initialized index loaded fully',
+  event: "loaded",
+  detail: "Initialized index loaded fully",
 });

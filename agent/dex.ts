@@ -1,10 +1,10 @@
-import { log } from './logger.js';
+import { log } from "./logger.js";
 
 export function getPackageName(): string | undefined {
   const pid = Process.id;
 
   // @ts-ignore
-  const cmdline = new File(`/proc/${pid}/cmdline`, 'rb');
+  const cmdline = new File(`/proc/${pid}/cmdline`, "rb");
 
   // @ts-ignore
   let packageName: string | undefined = cmdline.readLine();
@@ -13,8 +13,8 @@ export function getPackageName(): string | undefined {
   // @ts-ignore
   cmdline.close();
 
-  if (packageName && packageName.includes(':')) {
-    packageName = packageName.split(':').at(0);
+  if (packageName?.includes(":")) {
+    packageName = packageName.split(":").at(0);
   }
 
   return packageName;
@@ -30,7 +30,7 @@ export function writeDexToFile(address: NativePointer) {
     const dex = address.readByteArray(dexSize);
     if (dex) {
       // @ts-ignore
-      const out = new File(fileName, 'wb');
+      const out = new File(fileName, "wb");
       // @ts-ignore
       out.write(dex);
       // @ts-ignore

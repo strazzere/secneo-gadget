@@ -1,4 +1,4 @@
-import { log } from './logger';
+import { log } from "./logger";
 
 const debug = true;
 
@@ -19,14 +19,14 @@ const minMemCpySizeNotify = 8;
 const trigger = false;
 
 function hookMemcpy() {
-  const memcpyPtr = Module.findExportByName(null, 'memcpy');
+  const memcpyPtr = Module.findExportByName(null, "memcpy");
   if (memcpyPtr) {
     if (debug) {
       log(` [+] memory : memcpy hooked @ ${memcpyPtr}`);
     }
 
     Interceptor.attach(memcpyPtr, {
-      onEnter: function (args) {
+      onEnter: (args) => {
         if (trigger) {
           if (args[2].toInt32() >= minMemCpySizeNotify) {
             log(`[*] memcpy(${args[0]}, ${args[1]}, ${args[2].toInt32()}`);
@@ -54,28 +54,28 @@ enum MPROTECT_FLAGS {
 }
 
 function parseFlags(flags: number) {
-  let ret = '';
+  let ret = "";
   const strings = Object.keys(MPROTECT_FLAGS);
   const values = Object.values(MPROTECT_FLAGS);
 
   values.forEach((value, index) => {
     if ((flags & Number(value)) !== 0) {
       if (ret.length > 0) {
-        ret = ret.concat(' | ');
+        ret = ret.concat(" | ");
       }
       ret = ret.concat(strings[index]);
     }
   });
 
-  if (ret === '') {
-    return 'PROT_NONE';
+  if (ret === "") {
+    return "PROT_NONE";
   }
 
   return ret;
 }
 
 function hookMprotect() {
-  const mprotectPtr = Module.findExportByName(null, 'mprotect');
+  const mprotectPtr = Module.findExportByName(null, "mprotect");
   if (mprotectPtr) {
     if (debug) {
       log(` [+] memory : mprotect hooked @ ${mprotectPtr}`);
@@ -89,9 +89,13 @@ function hookMprotect() {
       },
       onLeave: function (retval) {
         if (retval.toInt32() === 0) {
-          log(` [+] mprotect(${this.address}, ${this.length}, ${this.protection}) : success`);
+          log(
+            ` [+] mprotect(${this.address}, ${this.length}, ${this.protection}) : success`,
+          );
         } else {
-          log(` [-] mprotect(${this.address}, ${this.length}, ${this.protection}) : failed`);
+          log(
+            ` [-] mprotect(${this.address}, ${this.length}, ${this.protection}) : failed`,
+          );
         }
       },
     });

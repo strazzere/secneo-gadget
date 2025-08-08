@@ -1,9 +1,10 @@
-import { log } from './logger.js';
-import { Stack } from './stack.js';
-import { getPackageName, writeDexToFile } from './dex.js';
-import { NeedleMap } from './needle.js';
+import Java from "frida-java-bridge";
+import { getPackageName, writeDexToFile } from "./dex.js";
+import { log } from "./logger.js";
+import { NeedleMap } from "./needle.js";
+import { Stack } from "./stack.js";
 
-const targetLibrary = 'libDexHelper.so';
+const targetLibrary = "libDexHelper.so";
 const debug = false;
 let dexBase: NativePointer;
 let cLoader: Java.Wrapper<object>;
@@ -11,7 +12,7 @@ let cLoader: Java.Wrapper<object>;
 const needleMap = new NeedleMap();
 
 function getDexBase(): NativePointer {
-  const base = Module.findBaseAddress(targetLibrary);
+  const base = Process.findModuleByName(targetLibrary)?.base;
   if (!base) {
     throw new Error(`Unable to get base address for ${targetLibrary}`);
   }
@@ -21,24 +22,28 @@ function getDexBase(): NativePointer {
 
 export function secneoJavaHooks() {
   // Java.deoptimizeEverything();
-  Java.perform(function () {
+  Java.perform(() => {
     log(` [*] Removing analytics and privacy services via java hooks`);
     // Don't load analytics to avoid libmsaoaidsec.so from being loaded, plus who cares about analytics
     // Lcom/dji/component/application/DJIPrimaryServiceBuilder;->a(Landroid/app/Application;)V;
     const DJIPrimaryServiceBuilder = Java.use(
       `com.dji.component.application.DJIPrimaryServiceBuilder`,
     );
-    DJIPrimaryServiceBuilder.a.overload('android.app.Application').implementation = function (
-      _application: Java.Wrapper<object>,
-    ) {
-      log(` [!] Skipping DJIPrimaryServiceBuilder.a(application)  (skip analytics injection)`);
+    DJIPrimaryServiceBuilder.a.overload(
+      "android.app.Application",
+    ).implementation = (_application: Java.Wrapper<object>) => {
+      log(
+        ` [!] Skipping DJIPrimaryServiceBuilder.a(application)  (skip analytics injection)`,
+      );
     };
 
     // Skip "STEP_ONE" of StartUpActivity which tries to start the privacy service we want to avoid
     const startUpActivityOrderEnum = Java.use(
       `com.dji.component.application.util.DJILaunchUtil$StartUpActivityOrder`,
     );
-    const DJILaunchUtil = Java.use(`com.dji.component.application.util.DJILaunchUtil`);
+    const DJILaunchUtil = Java.use(
+      `com.dji.component.application.util.DJILaunchUtil`,
+    );
     DJILaunchUtil.handleAppStartUp.overload(
       `android.content.Context`,
       `com.dji.component.application.util.DJILaunchUtil$StartUpActivityOrder`,
@@ -60,35 +65,38 @@ export function secneoJavaHooks() {
   });
 }
 
-function catchAndUseClassLoader(callback: (classLoader: Java.Wrapper<object>) => void) {
+function catchAndUseClassLoader(
+  callback: (classLoader: Java.Wrapper<object>) => void,
+) {
   Java.performNow(() => {
-    const dexclassLoader = Java.use('dalvik.system.DexClassLoader');
-    dexclassLoader.loadClass.overload('java.lang.String').implementation = function (name: string) {
-      const result = this.loadClass(name, false);
-      if (!cLoader) {
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
-        cLoader = this;
-        callback(cLoader);
-      }
+    const dexclassLoader = Java.use("dalvik.system.DexClassLoader");
+    dexclassLoader.loadClass.overload("java.lang.String").implementation =
+      function (name: string) {
+        const result = this.loadClass(name, false);
+        if (!cLoader) {
+          // eslint-disable-next-line @typescript-eslint/no-this-alias
+          cLoader = this;
+          callback(cLoader);
+        }
 
-      return result;
-    };
+        return result;
+      };
   });
 }
 
 export function forceLoadClasses() {
   const packagename = getPackageName();
 
-  if (packagename && !packagename.includes('pilot')) {
+  if (packagename && !packagename.includes("pilot")) {
     // We know this works fine for Fly, so just retain the logic
     catchAndUseClassLoader((classLoader) => {
-      log('  [+] Classloader found, attempting to load classes now!');
+      log("  [+] Classloader found, attempting to load classes now!");
       // Load these now incase the class loader object for some reason dies -- which does happen (removed likely)
       loadClasses(classLoader);
     });
   } else {
     // This appears to always be present in secneo stubs, so we can use this to locate the correct classloader
-    const knownSecNeoClass = 'com/secneo/apkwrapper/AW';
+    const knownSecNeoClass = "com/secneo/apkwrapper/AW";
     let classLoaders = Java.enumerateClassLoadersSync();
 
     classLoaders = classLoaders.filter((classLoader) => {
@@ -116,7 +124,7 @@ function loadClasses(classLoader: Java.Wrapper<object>) {
   let loaded = 0;
   let errorLoading = 0;
 
-  Java.performNow(function () {
+  Java.performNow(() => {
     if (classLoader !== null) {
       let classesToLoad: string[] = [];
       const neededClasses = getNeededClasses();
@@ -133,7 +141,7 @@ function loadClasses(classLoader: Java.Wrapper<object>) {
           // Force resolve
           classLoader.loadClass(clazz, true);
           loaded++;
-          if (loaded % 1000 == 0) {
+          if (loaded % 1000 === 0) {
             log(` [+] Have caught at least ${loaded} functions so far...`);
           }
         } catch (error) {
@@ -158,10 +166,12 @@ export function dumpDexFiles() {
   // LOAD:0000000000031684 ; __int64 __fastcall expandedv2data(char *p, int, int *)
   // LOAD:0000000000031684                 EXPORT _Z14expandedv2dataPciPi
   // (0x6E9B299684 - 0x6E9B268000).toString(16) = 0x31684
-  const _Z14expandedv2dataPciPi = Module.findExportByName(targetLibrary, `_Z14expandedv2dataPciPi`);
+  const _Z14expandedv2dataPciPi = Process.getModuleByName(
+    targetLibrary,
+  ).findExportByName(`_Z14expandedv2dataPciPi`);
   // const _Z14expandedv2dataPciPi = dexBase.add(0x031684);
   if (_Z14expandedv2dataPciPi) {
-    log('[*] _Z14expandedv2dataPciPi : ', _Z14expandedv2dataPciPi);
+    log("[*] _Z14expandedv2dataPciPi : ", _Z14expandedv2dataPciPi);
     Interceptor.attach(_Z14expandedv2dataPciPi, {
       onEnter: function (args) {
         this.args0 = args[0];
@@ -175,7 +185,7 @@ export function dumpDexFiles() {
         writeDexToFile(args[0]);
         log(Stack.native(this.context));
       },
-      onLeave: function (_retval) {
+      onLeave: (_retval) => {
         // At the return it isn't actually going to be fixed, annoyingly
         // so nothing to do here, as we already captured the output we want
       },
@@ -200,7 +210,7 @@ export function dumpDexFiles() {
 export function forkerEtc() {
   const forkerPtr = dexBase.add(0x9e40c);
   Interceptor.attach(forkerPtr, {
-    onEnter: function (_args) {
+    onEnter: (_args) => {
       log(`[*] fork was hit`);
     },
   });
@@ -259,12 +269,12 @@ function antiDebugThreadBlockerReplaceThreadFunctions() {
     Interceptor.replace(
       dexBase.add(address),
       new NativeCallback(
-        function () {
+        () => {
           log(`===> skipping anti debug thread ${index}...`);
           return;
         },
-        'void',
-        ['void'],
+        "void",
+        ["void"],
       ),
     );
   });
@@ -276,7 +286,7 @@ export function _antiDebugStrStr() {
   Interceptor.attach(discountStrStrPtr, {
     onEnter: function (args) {
       this.arg0 = args[0].readUtf8String();
-      const buf = Memory.allocUtf8String('derp');
+      const buf = Memory.allocUtf8String("derp");
       this.buf = buf;
       args[1] = buf;
       this.arg1 = args[1].readUtf8String();
@@ -326,21 +336,20 @@ function _antiDebugMapSeeker() {
 
   // This is a similar solution, but less clean
   // _Z33pBB89D708E26FE3A73359BD23D6E2F4D8i
-  const _Z33p85949C9CA7704A6EFD2777EB9580B669i = Module.findExportByName(
+  const _Z33p85949C9CA7704A6EFD2777EB9580B669i = Process.getModuleByName(
     targetLibrary,
-    '_Z33p85949C9CA7704A6EFD2777EB9580B669i',
-  );
+  ).findExportByName("_Z33p85949C9CA7704A6EFD2777EB9580B669i");
   if (_Z33p85949C9CA7704A6EFD2777EB9580B669i) {
     Interceptor.replace(
       _Z33p85949C9CA7704A6EFD2777EB9580B669i,
       new NativeCallback(
-        function (_int) {
+        (_int) => {
           // log('skipping...');
           // unprotectLibArt()
           return 0;
         },
-        'int',
-        ['int'],
+        "int",
+        ["int"],
       ),
     );
   }
@@ -391,38 +400,39 @@ function _antiDebugMapSeeker() {
  * where we just replace the methods all together
  */
 export function _antiDebugThreadReplacer() {
-  const pthreadCreate = Module.getExportByName('libc.so', 'pthread_create');
+  const pthreadCreate =
+    Process.getModuleByName("libc.so").getExportByName("pthread_create");
   log(`Hooking pthread_create : ${pthreadCreate}`);
   Interceptor.attach(pthreadCreate, {
     onEnter: function (args) {
       const functionAddress = args[2] as NativePointer;
       // Only step into extended functionality if the spawned thread originates from our
       // target library
-      if (Stack.getModuleInfo(functionAddress).includes('DexHelper')) {
+      if (Stack.getModuleInfo(functionAddress).includes("DexHelper")) {
         // This will represent itself as segmentation faults if runs, it will also clear the pc / stack while accessing
         // unknown memory
         if (functionAddress.equals(dexBase.add(0x9ec5c))) {
           Interceptor.replace(
             dexBase.add(0x9ec5c),
             new NativeCallback(
-              function () {
+              () => {
                 log(`===> skipping anti debug thread 1...`);
                 return;
               },
-              'void',
-              ['void'],
+              "void",
+              ["void"],
             ),
           );
         } else if (functionAddress.equals(dexBase.add(0xaa97c))) {
           Interceptor.replace(
             dexBase.add(0xaa97c),
             new NativeCallback(
-              function () {
+              () => {
                 log(`===> skipping anti debug thread 2...`);
                 return;
               },
-              'void',
-              ['void'],
+              "void",
+              ["void"],
             ),
           );
         } else if (functionAddress.equals(dexBase.add(0x9d73c))) {
@@ -430,40 +440,42 @@ export function _antiDebugThreadReplacer() {
           Interceptor.replace(
             dexBase.add(0x9d73c),
             new NativeCallback(
-              function () {
+              () => {
                 log(`===> skipping anti debug thread 3...`);
                 return;
               },
-              'void',
-              ['void'],
+              "void",
+              ["void"],
             ),
           );
         } else if (functionAddress.equals(dexBase.add(0xe3fd0))) {
           Interceptor.replace(
             dexBase.add(0xe3fd0),
             new NativeCallback(
-              function () {
+              () => {
                 log(`===> skipping anti debug thread 4...`);
                 return;
               },
-              'void',
-              ['void'],
+              "void",
+              ["void"],
             ),
           );
         } else if (functionAddress.equals(dexBase.add(0x9d030))) {
           Interceptor.replace(
             dexBase.add(0x9d030),
             new NativeCallback(
-              function () {
+              () => {
                 log(`===> skipping anti debug thread 5...`);
                 return;
               },
-              'void',
-              ['void'],
+              "void",
+              ["void"],
             ),
           );
         } else {
-          log(` ======= >pthread_create : ${functionAddress} : ${functionAddress.sub(dexBase)}`);
+          log(
+            ` ======= >pthread_create : ${functionAddress} : ${functionAddress.sub(dexBase)}`,
+          );
           log(`===> pthread_create(${functionAddress}) for unknown thread`);
           log(Stack.native(this.context));
         }
@@ -474,13 +486,13 @@ export function _antiDebugThreadReplacer() {
 
 // Experimental why trying to avoid somethings, doesn't seem to help
 function _unprotectLibArt() {
-  const libArt = Process.findModuleByName('libart.so');
+  const libArt = Process.findModuleByName("libart.so");
 
   if (libArt) {
-    const ranges = libArt.enumerateRanges('---');
+    const ranges = libArt.enumerateRanges("---");
     ranges.forEach((rangeDetails) => {
-      if (rangeDetails.protection !== 'rwx') {
-        Memory.protect(rangeDetails.base, rangeDetails.size, 'rwx');
+      if (rangeDetails.protection !== "rwx") {
+        Memory.protect(rangeDetails.base, rangeDetails.size, "rwx");
       }
       // log(`${rangeDetails.base} : ${rangeDetails.protection}`)
     });
@@ -536,7 +548,7 @@ function printCodeItem(codeItem: NativePointer) {
   if (instructions !== null) {
     const instructionsArray = new Uint8Array(instructions);
 
-    log(`insns : ${Buffer.from(instructionsArray).toString('hex')}`);
+    log(`insns : ${Buffer.from(instructionsArray).toString("hex")}`);
   }
 
   log(
@@ -595,8 +607,11 @@ function hookedArt() {
   //   'bool',
   // ]);
 
-  const getCodeItemPtr = Module.getExportByName('libart.so', 'NterpGetCodeItem');
-  const getCodeItem = new NativeFunction(getCodeItemPtr, 'pointer', ['pointer']);
+  const getCodeItemPtr =
+    Process.getModuleByName("libart.so").getExportByName("NterpGetCodeItem");
+  const getCodeItem = new NativeFunction(getCodeItemPtr, "pointer", [
+    "pointer",
+  ]);
 
   // LOAD:0000000000048DA4 hooked_ZN3art15instrumentation15Instrumentation21InitializeMethodsCode_ZN3art15instrumentation15Instrumentation21InitializeMethodsCodeEPNS_9ArtMethodEPKv
   // LOAD:0000000000048DA4 ; DATA XREF: hook_art_initialize_methods_function+199C↓o
@@ -619,7 +634,9 @@ function hookedArt() {
         // which should be unique
         this.needle = codeItem.readByteArray(16 + 8);
         if (debug) {
-          log(` [+] initializeMethodsCode(${args[0]}, ${args[1]}, ${args[2]}) `);
+          log(
+            ` [+] initializeMethodsCode(${args[0]}, ${args[1]}, ${args[2]}) `,
+          );
           if (codeItem) {
             log(printCodeItem(codeItem));
           }
@@ -632,7 +649,10 @@ function hookedArt() {
         const codeItem = getCodeItem(this.curArtMethod);
         const codeItemData = getCodeItemData(codeItem);
         if (codeItemData) {
-          if (!isSame(this.incomingCodeItem, codeItemData) && !isSame(codeItemData, this.needle)) {
+          if (
+            !isSame(this.incomingCodeItem, codeItemData) &&
+            !isSame(codeItemData, this.needle)
+          ) {
             dumpCodeItem(this.needle, codeItem);
             if (debug) {
               log(printCodeItem(codeItem));
@@ -648,8 +668,10 @@ function hookedArt() {
 function _linkerHooks() {
   const linkerHook = dexBase.add(0xa6ed4);
   Interceptor.attach(linkerHook, {
-    onEnter: function (args) {
-      log(`*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `);
+    onEnter: (args) => {
+      log(
+        `*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `,
+      );
       // const library = args[0].readUtf8String();
       // if (library?.includes('libc++_shared.so')) {
       //   secneoJavaHooks()
@@ -659,17 +681,16 @@ function _linkerHooks() {
       //   args[0] = Memory.allocUtf8String(library)
       // }
     },
-    onLeave: function (_retval) {
+    onLeave: (_retval) => {
       log(`*************************************** EXITING linkerHook`);
     },
   });
 }
 
 function _hookingEngine() {
-  const get_libart_funaddrP = Module.findExportByName(
+  const get_libart_funaddrP = Process.getModuleByName(
     targetLibrary,
-    'p78C86B081F85A608BB75372604D6C75E',
-  );
+  ).findExportByName("p78C86B081F85A608BB75372604D6C75E");
   if (get_libart_funaddrP) {
     Interceptor.attach(get_libart_funaddrP, {
       onEnter: function (_args) {
@@ -705,7 +726,7 @@ function _hookingEngine() {
   // LOAD:0000000000093EDC                 EXPORT hookedFunAddr_read
   const hookedFunctionPtr = dexBase.add(0x0000000000093edc);
   if (hookedFunctionPtr) {
-    log('[*] hookFunctionPtr : ', hookedFunctionPtr);
+    log("[*] hookFunctionPtr : ", hookedFunctionPtr);
     Interceptor.attach(hookedFunctionPtr, {
       onEnter: function (args) {
         // args[0] - function address to replace
@@ -716,14 +737,14 @@ function _hookingEngine() {
           )}) : via ${Stack.getModuleInfo(this.returnAddress)}`,
         );
         const functionToReplace = Stack.getModuleInfo(args[0]);
-        if (functionToReplace.includes('linker64')) {
+        if (functionToReplace.includes("linker64")) {
           Interceptor.attach(args[1], {
-            onEnter: function (args) {
+            onEnter: (args) => {
               log(
                 `*************************************** INSIDE linkerHook ${args[0].readUtf8String()} `,
               );
             },
-            onLeave: function (_retval) {
+            onLeave: (_retval) => {
               log(`*************************************** EXITING linkerHook`);
             },
           });
@@ -737,7 +758,7 @@ function _hookingEngine() {
         //   })
         // }
       },
-      onLeave: function (_retval) {
+      onLeave: (_retval) => {
         log(`left`);
       },
     });
@@ -746,7 +767,7 @@ function _hookingEngine() {
   // 0000000000089E00 hooked_read 93EDC
   const hooked_read = dexBase.add(0x0000000000089e00);
   if (hooked_read) {
-    log('[*] hooked_read : ', hooked_read);
+    log("[*] hooked_read : ", hooked_read);
     Interceptor.attach(hooked_read, {
       onEnter: function (_args) {
         log(`Hit hooked_read`);
@@ -758,7 +779,7 @@ function _hookingEngine() {
   // const hookMethods = Module.findExportByName('libDexHelper.so', 'pCDF4A538018372C2F08E8231214F0E82');
   const hookMethods = dexBase.add(0x9528c);
   if (hookMethods) {
-    log('[*] hookMethod : ', hookMethods);
+    log("[*] hookMethod : ", hookMethods);
     Interceptor.attach(hookMethods, {
       onEnter: function (args) {
         const dlHandle = args[0];
@@ -774,7 +795,11 @@ function _hookingEngine() {
   }
 }
 
-export function hookDexHelper(anti = false, dumpDex = false, dumpMethods = false) {
+export function hookDexHelper(
+  anti = false,
+  dumpDex = false,
+  dumpMethods = false,
+) {
   if (!dexBase) {
     dexBase = getDexBase();
   }
@@ -1122,7 +1147,7 @@ export function hookDexHelper(anti = false, dumpDex = false, dumpMethods = false
 
 function getNeededClasses(): string[] {
   return [
-    'am/util/viewpager/adapter/FragmentRemovePagerAdapter',
-    'derp/derpy/derpiness'
+    "am/util/viewpager/adapter/FragmentRemovePagerAdapter",
+    "derp/derpy/derpiness",
   ];
 }

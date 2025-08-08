@@ -1,4 +1,4 @@
-import { log } from './logger';
+import { log } from "./logger";
 
 const debug = true;
 
@@ -17,14 +17,14 @@ export function inotifyHooks() {
 }
 
 function inotifyInitHook() {
-  const inotify_initPtr = Module.findExportByName(null, 'inotify_init');
+  const inotify_initPtr = Module.findExportByName(null, "inotify_init");
   if (inotify_initPtr) {
     if (debug) {
       log(` [+] inotify : inotify_init hooked @ ${inotify_initPtr}`);
     }
 
     Interceptor.attach(inotify_initPtr, {
-      onLeave: function (retval) {
+      onLeave: (retval) => {
         log(` [!] inotify_init : fd : ${retval}`);
       },
     });
@@ -66,57 +66,64 @@ enum INOTIFY_FLAGS {
 }
 
 function parseFlags(flags: number) {
-  let ret = '';
+  let ret = "";
   const strings = Object.keys(INOTIFY_FLAGS);
   const values = Object.values(INOTIFY_FLAGS);
 
   values.forEach((value, index) => {
     if ((flags & Number(value)) !== 0) {
       if (ret.length > 0) {
-        ret = ret.concat(' | ');
+        ret = ret.concat(" | ");
       }
       ret = ret.concat(strings[index]);
     }
   });
 
-  if (ret === '') {
-    return 'null';
+  if (ret === "") {
+    return "null";
   }
 
   return ret;
 }
 
 function inotifyAddHook() {
-  const inotify_add_watchPtr = Module.findExportByName(null, 'inotify_add_watch');
+  const inotify_add_watchPtr = Module.findExportByName(
+    null,
+    "inotify_add_watch",
+  );
   if (inotify_add_watchPtr) {
     if (debug) {
       log(` [+] inotify : inotify_add_watch hooked @ ${inotify_add_watchPtr}`);
     }
 
     Interceptor.attach(inotify_add_watchPtr, {
-      onEnter: function (args) {
+      onEnter: (args) => {
         const inotify_fd = args[0];
         const path = args[1].readUtf8String();
         const flags = args[2].toUInt32();
-        log(` [+] inotify_add_watch(${inotify_fd}, ${path}, ${parseFlags(flags)})`);
+        log(
+          ` [+] inotify_add_watch(${inotify_fd}, ${path}, ${parseFlags(flags)})`,
+        );
       },
     });
   }
 }
 
 function inotifyRmHook() {
-  const inotify_rm_watchPtr = Module.findExportByName(null, 'inotify_rm_watch');
+  const inotify_rm_watchPtr = Module.findExportByName(null, "inotify_rm_watch");
   if (inotify_rm_watchPtr) {
     if (debug) {
       log(` [+] inotify : inotify_rm_watch hooked @ ${inotify_rm_watchPtr}`);
     }
 
     Interceptor.attach(inotify_rm_watchPtr, {
-      onEnter: function (args) {
+      onEnter: (args) => {
         const inotify_fd = args[0];
         const path = args[1].readUtf8String();
         const flags = args[2].toUInt32();
-        log(` [-] inotify_rm_watch(${inotify_fd}, ${path}, ${parseFlags(flags)})`);
+        log(
+          ` [-] inotify_rm_watch(${inotify_fd}, ${path}, ${parseFlags(flags)})`,
+        );
       },
     });
   }
