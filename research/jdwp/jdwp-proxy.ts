@@ -23,21 +23,21 @@
 // server => data(0000000b0000001a000104)
 // server => data(0000000b0000001c000109)
 //
-import net from 'net';
+import net from "node:net";
 
-const proxy = net.connect({ host: 'localhost', port: 8200 });
+const proxy = net.connect({ host: "localhost", port: 8200 });
 const server = net.createServer((socket) => {
-  socket.on('data', (data) => {
-    console.log(`server => data(${data.toString('hex')})`);
+  socket.on("data", (data) => {
+    console.log(`server => data(${data.toString("hex")})`);
     proxy.write(data);
   });
-  proxy.on('data', (data) => {
+  proxy.on("data", (data) => {
     socket.write(data);
   });
 });
 
-server.on('connection', () => {
+server.on("connection", () => {
   console.log(`server => connection`);
 });
 
-server.listen(8100, 'localhost');
+server.listen(8100, "localhost");

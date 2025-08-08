@@ -23,7 +23,7 @@ export function systemlibcHooks() {
 }
 
 function timeHook() {
-  const timePtr = Module.findExportByName(null, "time");
+  const timePtr = Module.findGlobalExportByName("time");
   if (timePtr) {
     log("[*] hooked time : ", timePtr);
     Interceptor.attach(timePtr, {
@@ -35,7 +35,8 @@ function timeHook() {
 }
 
 function sleepHook() {
-  const sleepPtr = Module.findExportByName("libc.so", "sleep");
+  const sleepPtr =
+    Process.findModuleByName("libc.so")?.getExportByName("sleep");
   if (sleepPtr) {
     log("[*] hooked sleep : ", sleepPtr);
     Interceptor.attach(sleepPtr, {
@@ -47,7 +48,7 @@ function sleepHook() {
 }
 
 function openHook() {
-  const openPtr = Module.findExportByName(null, "open");
+  const openPtr = Module.findGlobalExportByName("open");
   if (openPtr) {
     Interceptor.attach(openPtr, {
       onEnter: (args) => {
@@ -60,7 +61,7 @@ function openHook() {
 }
 
 function fopenHook() {
-  const fopenPtr = Module.findExportByName(null, "fopen");
+  const fopenPtr = Module.findGlobalExportByName("fopen");
   if (fopenPtr) {
     Interceptor.attach(fopenPtr, {
       onEnter: function (args) {
@@ -74,7 +75,7 @@ function fopenHook() {
 }
 
 function strcmpHook() {
-  const strcmp = Module.findExportByName(null, "strcmp");
+  const strcmp = Module.findGlobalExportByName("strcmp");
   if (strcmp) {
     log("[*] hooked strcmp : ", strcmp);
     Interceptor.attach(strcmp, {
@@ -96,7 +97,7 @@ function strcmpHook() {
 }
 
 function dlopenHook() {
-  const dlopenPtr = Module.findExportByName(null, "dlopen");
+  const dlopenPtr = Module.findGlobalExportByName("dlopen");
   if (dlopenPtr) {
     log(`[*] hooked dlopen @ ${dlopenPtr}`);
     Interceptor.attach(dlopenPtr, {
@@ -111,7 +112,7 @@ function dlopenHook() {
 }
 
 function dlsymHook() {
-  const dlsymPtr = Module.findExportByName(null, "dlsym");
+  const dlsymPtr = Module.findGlobalExportByName("dlsym");
   if (dlsymPtr) {
     log(`[*] hooked dlsym @ ${dlsymPtr}`);
     Interceptor.attach(dlsymPtr, {
@@ -128,7 +129,7 @@ function dlsymHook() {
 }
 
 function readlinkHook() {
-  const dlsymPtr = Module.findExportByName(null, "readlink");
+  const dlsymPtr = Module.findGlobalExportByName("readlink");
   if (dlsymPtr) {
     log(`[*] hooked readlink @ ${dlsymPtr}`);
     Interceptor.attach(dlsymPtr, {
@@ -149,7 +150,7 @@ function readlinkHook() {
   }
 }
 
-// const accessPtr = Module.findExportByName(null, 'access');
+// const accessPtr = Module.findGlobalExportByName('access');
 // if (accessPtr) {
 //   log('[*] hooked access : ', accessPtr);
 //   Interceptor.attach(accessPtr, {

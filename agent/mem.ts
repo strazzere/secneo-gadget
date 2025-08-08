@@ -19,7 +19,7 @@ const minMemCpySizeNotify = 8;
 const trigger = false;
 
 function hookMemcpy() {
-  const memcpyPtr = Module.findExportByName(null, "memcpy");
+  const memcpyPtr = Module.findGlobalExportByName("memcpy");
   if (memcpyPtr) {
     if (debug) {
       log(` [+] memory : memcpy hooked @ ${memcpyPtr}`);
@@ -75,7 +75,7 @@ function parseFlags(flags: number) {
 }
 
 function hookMprotect() {
-  const mprotectPtr = Module.findExportByName(null, "mprotect");
+  const mprotectPtr = Module.findGlobalExportByName("mprotect");
   if (mprotectPtr) {
     if (debug) {
       log(` [+] memory : mprotect hooked @ ${mprotectPtr}`);

@@ -14,7 +14,7 @@
     "prepare": "npm run build",
     "build": "frida-compile agent/index.ts -o build/_agent.js -c && tsc",
     "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
-    "lint": "npx @biomejs/biome check --write ./src ./agent",
+    "lint": "npx @biomejs/biome check --write ./src ./agent ./research",
     "start": "npm run prepare && node build/index.js",
     "spawn": "frida -U -f dji.go.v5 -l build/_agent.js",
     "spawn-pilot": "frida -U -f com.dji.industry.pilot -l build/_agent.js",

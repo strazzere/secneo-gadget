@@ -14,6 +14,8 @@
 //   return art_method;
 // }
 
+import Java from "frida-java-bridge";
+
 export class JNI {
   handle: NativePointer;
   findClass: NativeFunction<

@@ -1,8 +1,7 @@
 import { log } from "./logger";
 import { Stack } from "./stack";
 
-const systemPropertyGetPtr = Module.findExportByName(
-  null,
+const systemPropertyGetPtr = Module.findGlobalExportByName(
   "__system_property_get",
 );
 if (systemPropertyGetPtr) {
@@ -24,8 +23,8 @@ if (systemPropertyGetPtr) {
 }
 
 // Can only be hooked after dex helper is unpacked
-const dexBase = Module.findBaseAddress("libDexHelper.so");
-const xorStuff = Module.findBaseAddress("libDexHelper.so")?.add(0x18220);
+const dexBase = Process.findModuleByName("libDexHelper.so")?.base;
+const xorStuff = Process.findModuleByName("libDexHelper.so")?.base.add(0x18220);
 if (xorStuff) {
   Interceptor.attach(xorStuff, {
     onEnter: function (args) {
@@ -41,7 +40,7 @@ if (xorStuff) {
   });
 }
 
-const openPtr = Module.findExportByName(null, "open");
+const openPtr = Module.findGlobalExportByName("open");
 if (openPtr) {
   Interceptor.attach(openPtr, {
     onEnter: (args) => {
@@ -63,7 +62,8 @@ if (openPtr) {
 // LOAD:000000000003B498                 BL              .memcmp
 // hook the above specific call to .memcmp and inspect the contents
 // this is likely the md5 (?) check against the original classes.dex for integrity check, I think?
-const memcmp = Module.findBaseAddress("libDexHelper.so")?.add(0x0003b498);
+const memcmp =
+  Process.findModuleByName("libDexHelper.so")?.base.add(0x0003b498);
 if (memcmp) {
   log("[*] hooked specific memcmp : ", memcmp);
   Interceptor.attach(memcmp, {

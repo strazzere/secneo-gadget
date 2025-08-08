@@ -17,7 +17,7 @@ export function inotifyHooks() {
 }
 
 function inotifyInitHook() {
-  const inotify_initPtr = Module.findExportByName(null, "inotify_init");
+  const inotify_initPtr = Module.findGlobalExportByName("inotify_init");
   if (inotify_initPtr) {
     if (debug) {
       log(` [+] inotify : inotify_init hooked @ ${inotify_initPtr}`);
@@ -87,10 +87,8 @@ function parseFlags(flags: number) {
 }
 
 function inotifyAddHook() {
-  const inotify_add_watchPtr = Module.findExportByName(
-    null,
-    "inotify_add_watch",
-  );
+  const inotify_add_watchPtr =
+    Module.findGlobalExportByName("inotify_add_watch");
   if (inotify_add_watchPtr) {
     if (debug) {
       log(` [+] inotify : inotify_add_watch hooked @ ${inotify_add_watchPtr}`);
@@ -110,7 +108,7 @@ function inotifyAddHook() {
 }
 
 function inotifyRmHook() {
-  const inotify_rm_watchPtr = Module.findExportByName(null, "inotify_rm_watch");
+  const inotify_rm_watchPtr = Module.findGlobalExportByName("inotify_rm_watch");
   if (inotify_rm_watchPtr) {
     if (debug) {
       log(` [+] inotify : inotify_rm_watch hooked @ ${inotify_rm_watchPtr}`);
