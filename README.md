@@ -1,6 +1,6 @@
 # SecNeo Gadget
 
-Gadget(s) for debugging, dumping and dissecting secneo protected applications
+Gadget(s) for debugging, dumping and dissecting `secneo` protected applications
 
 *WARNING* : This is a relatively old and outdated approach to unpacking secneo. Essentially everything has changed after multiple articles posted methods to defeat the (now) older protections. This is open sourced now as it is not working out of the box, however it hopefully helps people with general frida functionality. _Do not open an issue asking why this doesn't work out of the box, because, I'm telling you right now, it doesn't_ - however there are lots of (hopefully) interesting usage patterns for people to reuse.
 
@@ -65,3 +65,19 @@ $ npm run watch
 
 And use an editor like Visual Studio Code for code completion and instant
 type-checking feedback.
+
+## License
+
+    Copyright (c) 2020-2025 Red Naga - Tim 'diff' Strazzere
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
