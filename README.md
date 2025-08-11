@@ -1,6 +1,6 @@
 # SecNeo Gadget
 
-Gadget(s) for debugging, dumping and dissecting `secneo` protected applications
+Gadget(s) for debugging, dumping and dissecting `secneo` protected applications via `typescript`.
 
 *WARNING* : This is a relatively old and outdated approach to unpacking secneo. Essentially everything has changed after multiple articles posted methods to defeat the (now) older protections. This is open sourced now as it is not working out of the box, however it hopefully helps people with general frida functionality. _Do not open an issue asking why this doesn't work out of the box, because, I'm telling you right now, it doesn't_ - however there are lots of (hopefully) interesting usage patterns for people to reuse.
 
