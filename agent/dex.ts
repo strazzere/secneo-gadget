@@ -3,14 +3,14 @@ import { log } from "./logger.js";
 export function getPackageName(): string | undefined {
   const pid = Process.id;
 
-  // @ts-ignore
+  // @ts-expect-error
   const cmdline = new File(`/proc/${pid}/cmdline`, "rb");
 
-  // @ts-ignore
+  // @ts-expect-error
   let packageName: string | undefined = cmdline.readLine();
   log(`packageName: ${packageName}`);
 
-  // @ts-ignore
+  // @ts-expect-error
   cmdline.close();
 
   if (packageName?.includes(":")) {
@@ -29,11 +29,11 @@ export function writeDexToFile(address: NativePointer) {
     log(`[*] Writing dex to ${fileName}`);
     const dex = address.readByteArray(dexSize);
     if (dex) {
-      // @ts-ignore
+      // @ts-expect-error
       const out = new File(fileName, "wb");
-      // @ts-ignore
+      // @ts-expect-error
       out.write(dex);
-      // @ts-ignore
+      // @ts-expect-error
       out.close();
     }
   } catch (e) {
