@@ -54,6 +54,16 @@ type ElfData = {
   relmap: Map<number, number> | undefined;
 };
 
+function safeRead(fd: number, buffer: NativePointer, size: number): void {
+  const bytesRead = readPtr(fd, buffer, size) as unknown as number;
+  if (bytesRead < 0) {
+    throw new Error(`read() failed with return value ${bytesRead}`);
+  }
+  if (bytesRead < size) {
+    log(`[!] Short read: expected ${size} bytes, got ${bytesRead}`);
+  }
+}
+
 function getElfData(module: Module): ElfData | undefined {
   const elfData: ElfData = {
     is32: false,
@@ -69,7 +79,7 @@ function getElfData(module: Module): ElfData | undefined {
   // Get elf header
   const header = Memory.alloc(64);
   lseekPtr(fd, 0, 0 /* SEEK_SET */);
-  readPtr(fd, header, 64);
+  safeRead(fd, header, 64);
 
   // Allow for both 32bit and 64bit binaries
   const is32 = header.add(4).readU8() === 1;
@@ -92,7 +102,7 @@ function getElfData(module: Module): ElfData | undefined {
   const sectionHeaders = Memory.alloc(sectionHeaderSize * sectionHeaderCount);
 
   lseekPtr(fd, sectionHeaderOffset, 0 /* SEEK_SET */);
-  readPtr(fd, sectionHeaders, sectionHeaderSize * sectionHeaderCount);
+  safeRead(fd, sectionHeaders, sectionHeaderSize * sectionHeaderCount);
 
   const stringTableOffset = is32
     ? sectionHeaders
@@ -113,7 +123,7 @@ function getElfData(module: Module): ElfData | undefined {
 
   const stringTable = Memory.alloc(stringTableSize);
   lseekPtr(fd, stringTableOffset, 0 /* SEEK_SET */);
-  readPtr(fd, stringTable, stringTableSize);
+  safeRead(fd, stringTable, stringTableSize);
 
   for (let i = 0; i < sectionHeaderCount; i++) {
     let sectionName = stringTable
@@ -148,23 +158,25 @@ function getElfData(module: Module): ElfData | undefined {
       size: sectionSize,
       data: undefined,
     };
-    if (sectionSize > 0) {
+    const neededSections = [
+      ".rodata",
+      ".text",
+      ".dynsym",
+      ".dynstr",
+      ".rel.dyn",
+      ".rel.plt",
+    ];
+    if (sectionSize > 0 && neededSections.includes(sectionName)) {
       section.data = Memory.alloc(sectionSize);
       lseekPtr(fd, sectionOffset, 0 /* SEEK_SET */);
-      readPtr(fd, section.data, sectionSize);
-    } else {
-      section.data = undefined;
+      safeRead(fd, section.data, sectionSize);
     }
 
     elfData.sections.push(section);
   }
 
-  const dynsym = elfData.sections.filter(
-    (section) => section.name === ".dynsym",
-  )[0];
-  const dynstr = elfData.sections.filter(
-    (section) => section.name === ".dynstr",
-  )[0];
+  const dynsym = elfData.sections.find((section) => section.name === ".dynsym");
+  const dynstr = elfData.sections.find((section) => section.name === ".dynstr");
 
   if (dynsym && dynstr) {
     const stringTable = module.base.add(dynstr.memoryOffset);
@@ -180,34 +192,43 @@ function getElfData(module: Module): ElfData | undefined {
     }
   }
 
-  const reldyn = elfData.sections.filter(
-    (section) => section.name === ".reldyn",
-  )[0];
+  // Elf32_Rel is 8 bytes (4 offset + 4 info), Elf64_Rel is 16 bytes (8 offset + 8 info)
+  const relEntrySize = is32 ? 8 : 16;
+
+  const reldyn = elfData.sections.find(
+    (section) => section.name === ".rel.dyn",
+  );
   elfData.relmap = new Map();
   if (reldyn) {
-    for (let i = 0; i < reldyn.size / 8; i++) {
-      const key = module.base.add(reldyn.memoryOffset + i * 8).readU32();
-      const value =
-        module.base.add(reldyn.memoryOffset + i * 8 + 4).readU32() >> 8;
+    for (let i = 0; i < reldyn.size / relEntrySize; i++) {
+      const entryBase = module.base.add(reldyn.memoryOffset + i * relEntrySize);
+      const key = is32 ? entryBase.readU32() : entryBase.readU64().toNumber();
+      const value = is32
+        ? entryBase.add(4).readU32() >> 8
+        : entryBase.add(8).readU64().toNumber() >> 32;
       if (key !== 0 && value !== 0) {
         elfData.relmap.set(key, value);
       }
     }
   }
 
-  const relplt = elfData.sections.filter(
-    (section) => section.name === ".relplt",
-  )[0];
+  const relplt = elfData.sections.find(
+    (section) => section.name === ".rel.plt",
+  );
   if (relplt) {
-    for (let i = 0; i < relplt.size / 8; i++) {
-      const key = module.base.add(relplt.memoryOffset + i * 8).readU32();
-      const value =
-        module.base.add(relplt.memoryOffset + i * 8 + 4).readU32() >> 8;
+    for (let i = 0; i < relplt.size / relEntrySize; i++) {
+      const entryBase = module.base.add(relplt.memoryOffset + i * relEntrySize);
+      const key = is32 ? entryBase.readU32() : entryBase.readU64().toNumber();
+      const value = is32
+        ? entryBase.add(4).readU32() >> 8
+        : entryBase.add(8).readU64().toNumber() >> 32;
       if (key !== 0 && value !== 0) {
         elfData.relmap.set(key, value);
       }
     }
   }
+
+  closePtr(fd);
 
   return elfData;
 }
@@ -258,14 +279,21 @@ export function findHooks(module: Module) {
           try {
             const instruction = Instruction.parse(
               module.base.add(section.memoryOffset).add(start),
-            ) as Arm64Instruction;
+            );
             log(
               `[!] Potential variance found that is ${end - start} bytes long;`,
             );
 
-            if (["ldr"].includes(instruction.mnemonic)) {
+            if (
+              instruction.mnemonic === "ldr" &&
+              (Process.arch === "arm64" || Process.arch === "arm")
+            ) {
+              const archInstruction =
+                Process.arch === "arm64"
+                  ? (instruction as Arm64Instruction)
+                  : (instruction as ArmInstruction);
               const trampoline = new NativePointer(
-                instruction.operands[1].value as number,
+                archInstruction.operands[1].value as number,
               ).readPointer();
               log(
                 `${DebugSymbol.fromAddress(
@@ -310,8 +338,8 @@ function getPackageName() {
     return "null";
   }
 
-  const buffer = Memory.alloc(32);
-  readPtr(fd, buffer, 32);
+  const buffer = Memory.alloc(256);
+  safeRead(fd, buffer, 256);
   closePtr(fd);
 
   return buffer.readUtf8String();
