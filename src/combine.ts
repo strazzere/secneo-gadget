@@ -76,50 +76,49 @@ function writeDexFile(file: File): string {
 async function main() {
   console.log("[*] SecNeo Stolen Bytecode Rebuilder\n");
 
-  const directory = "./dumped/pilot/2.5.1.15/dumped";
+  const directory = process.argv[2];
+  if (!directory) {
+    console.error("Usage: combine <directory>");
+    process.exit(1);
+  }
   const bytecodeData = JSON.parse(
     fs.readFileSync(`${directory}/data.json`, "utf-8"),
   );
 
-  if (!bytecodeData && bytecodeData.length <= 0) {
+  if (!bytecodeData || bytecodeData.length <= 0) {
     throw new Error("Unable to find any bytecode data to replace");
   }
 
-  const decryptedCodes: string[] = [];
-  const needles: string[] = [];
+  const needleSet = new Set<string>();
+  const entries: { needle: string; data: string }[] = [];
 
   console.time(" [!] Removed duplicates and unneeded functions");
   for (let i = 0; i < bytecodeData.length; i++) {
-    if (bytecodeData[i]?.needle !== bytecodeData[i]?.data)
-      if (
-        bytecodeData[i]?.needle &&
-        bytecodeData[i]?.data &&
-        // We don't need to bother searching for a needle that is going to be replaces by the same thing
-        bytecodeData[i]?.needle !== bytecodeData[i]?.data &&
-        !needles.includes(bytecodeData[i].needle)
-      ) {
-        decryptedCodes.push(bytecodeData[i].data);
-        needles.push(bytecodeData[i].needle);
-      }
+    if (
+      bytecodeData[i]?.needle &&
+      bytecodeData[i]?.data &&
+      // We don't need to bother searching for a needle that is going to be replaced by the same thing
+      bytecodeData[i]?.needle !== bytecodeData[i]?.data &&
+      !needleSet.has(bytecodeData[i].needle)
+    ) {
+      entries.push({
+        needle: bytecodeData[i].needle,
+        data: bytecodeData[i].data,
+      });
+      needleSet.add(bytecodeData[i].needle);
+    }
   }
   console.timeEnd(" [!] Removed duplicates and unneeded functions");
-  const itemsRemoved = bytecodeData.length - decryptedCodes.length;
+  const itemsRemoved = bytecodeData.length - entries.length;
   console.log(
-    ` [+] Dex methods to recover: ${decryptedCodes.length} ${
+    ` [+] Dex methods to recover: ${entries.length} ${
       itemsRemoved > 0
         ? `(${itemsRemoved} unneeded method${itemsRemoved > 1 ? "s removed" : " removed"})`
         : ""
     }`,
   );
-  const saveDeduped = true;
-  if (saveDeduped) {
-    const deduped = [];
-    for (let i = 0; i < decryptedCodes.length; i++) {
-      deduped.push({ needle: needles[i], data: decryptedCodes[i] });
-    }
 
-    fs.writeFileSync("./deduped.json", JSON.stringify(deduped));
-  }
+  fs.writeFileSync("./deduped.json", JSON.stringify(entries));
 
   // Would be more interesting if we could dynamically type that these don't have issues
   // but for the time being, I don't care much to solve that and we can just hardcode them
@@ -156,36 +155,106 @@ async function main() {
     cliProgress.Presets.shades_classic,
   );
 
-  progress.start(decryptedCodes.length, 0);
-  console.time(" [+] Function Matching");
-  const matched: string[] = [];
-  const unmatched: string[] = [];
+  // Pre-convert all hex strings to Buffers and build a prefix hash map
+  // for single-pass scanning through each dex data segment
+  const PREFIX_LEN = 4;
+  const needleBuffers: Buffer[] = entries.map((e) =>
+    Buffer.from(e.needle, "hex"),
+  );
+  const dataBuffers: Buffer[] = entries.map((e) => Buffer.from(e.data, "hex"));
+  const prefixMap = new Map<number, number[]>();
+  const shortNeedles: number[] = [];
 
-  // This is actually faster over the long run than using a forEach
-  for (let i = 0; i < decryptedCodes.length; i++) {
-    const needle = Buffer.from(needles[i], "hex");
-    let written = false;
-    for (let x = 0; x < dexFiles.length; x++) {
-      const index = dexFiles[x].dataSegment.buffer.indexOf(needle);
-      if (index !== -1) {
-        const codeBuffer = Buffer.from(decryptedCodes[i], "hex");
-        dexFiles[x].dataSegment.hits++;
-        codeBuffer.copy(dexFiles[x].dataSegment.buffer, index);
-        written = true;
-        break;
+  for (let i = 0; i < needleBuffers.length; i++) {
+    if (needleBuffers[i].length < PREFIX_LEN) {
+      shortNeedles.push(i);
+      continue;
+    }
+    const prefix = needleBuffers[i].readUInt32LE(0);
+    let bucket = prefixMap.get(prefix);
+    if (!bucket) {
+      bucket = [];
+      prefixMap.set(prefix, bucket);
+    }
+    bucket.push(i);
+  }
+
+  const matchedFlags = new Uint8Array(entries.length);
+  let remaining = entries.length;
+
+  progress.start(entries.length, 0);
+  console.time(" [+] Function Matching");
+
+  for (let x = 0; x < dexFiles.length && remaining > 0; x++) {
+    const buf = dexFiles[x].dataSegment.buffer;
+
+    // Single-pass scan using prefix hash map
+    for (
+      let offset = 0;
+      offset <= buf.length - PREFIX_LEN && remaining > 0;
+      offset++
+    ) {
+      const prefix = buf.readUInt32LE(offset);
+      const candidates = prefixMap.get(prefix);
+      if (!candidates) continue;
+
+      for (let c = 0; c < candidates.length; c++) {
+        const idx = candidates[c];
+        const needle = needleBuffers[idx];
+        if (offset + needle.length > buf.length) continue;
+
+        if (
+          buf.compare(
+            needle,
+            0,
+            needle.length,
+            offset,
+            offset + needle.length,
+          ) === 0
+        ) {
+          dataBuffers[idx].copy(buf, offset);
+          dexFiles[x].dataSegment.hits++;
+          matchedFlags[idx] = 1;
+          remaining--;
+          progress.increment();
+          // Remove matched entry from bucket
+          candidates.splice(c, 1);
+          if (candidates.length === 0) prefixMap.delete(prefix);
+          break;
+        }
       }
     }
 
-    if (written) {
-      progress.increment();
-      matched.push(decryptedCodes[i]);
-    } else {
-      unmatched.push(needles[i]);
+    // Fallback for needles shorter than prefix length
+    for (let s = 0; s < shortNeedles.length && remaining > 0; s++) {
+      const idx = shortNeedles[s];
+      if (matchedFlags[idx]) continue;
+      const needle = needleBuffers[idx];
+      const index = buf.indexOf(needle);
+      if (index !== -1) {
+        dataBuffers[idx].copy(buf, index);
+        dexFiles[x].dataSegment.hits++;
+        matchedFlags[idx] = 1;
+        remaining--;
+        progress.increment();
+      }
     }
   }
 
+  // Finalize progress for any unmatched entries
+  progress.update(entries.length);
   progress.stop();
   console.timeEnd(" [+] Function Matching");
+
+  const matched: string[] = [];
+  const unmatched: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    if (matchedFlags[i]) {
+      matched.push(entries[i].data);
+    } else {
+      unmatched.push(entries[i].needle);
+    }
+  }
 
   console.log(` [+] Matched : ${matched.length}`);
   fs.writeFileSync(`${directory}/matched.out`, matched.join("\n"));
