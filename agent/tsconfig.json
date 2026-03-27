@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es2021",
+    "lib": ["es2021", "esnext"],
+    "allowJs": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strictPropertyInitialization": false,
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "types": ["frida-gum", "node"],
+    "noEmit": true,
+    "composite": true
+  },
+  "include": ["./**/*.ts"]
+}

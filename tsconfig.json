@@ -1,23 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "es2021",
-    "lib": ["es2021", "esnext"],
-    "allowJs": true,
-    "sourceMap": true,
-    "strict": true,
-    "outDir": "build",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "strictPropertyInitialization": false,
-    "moduleResolution": "node",
-    "declaration": true,
-  },
-  "include": ["src/*.ts"],
-  "exclude": [
-    "src/**/*.spec.ts",
-    "node_modules",
-    "./node_modules",
-    "./node_modules/**/*",
-    "./node_modules/@types/node/index.d.ts",
+  "references": [
+    { "path": "./src" },
+    { "path": "./agent" }
   ],
+  "files": []
 }
