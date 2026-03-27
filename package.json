@@ -11,7 +11,7 @@
   "type": "module",
   "scripts": {
     "prepare": "npm run build",
-    "build": "frida-compile agent/index.ts -o build/_agent.js -c && tsc",
+    "build": "frida-compile agent/index.ts -o build/_agent.js -c && tsc --build",
     "watch": "frida-compile agent/index.ts -o build/_agent.js -w",
     "lint": "npx @biomejs/biome check --write ./src ./agent ./research",
     "start": "npm run prepare && node build/index.js",
@@ -23,10 +23,10 @@
     "@biomejs/biome": "^2.1.4",
     "@types/cli-progress": "^3.11.0",
     "@types/frida-gum": "^19.0.1",
-    "@types/node": "^24.10.13",
+    "@types/node": "^25.5.0",
     "frida-compile": "^19.0.4",
     "frida-java-bridge": "^7.0.8",
-    "typescript": "^5.3.3"
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "cli-progress": "^3.11.2",
