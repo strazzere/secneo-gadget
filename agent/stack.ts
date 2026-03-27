@@ -4,7 +4,7 @@ import Java from "frida-java-bridge";
  * Helper class for getting stack traces and backtraces.
  */
 export class Stack {
-  private threadObj: Java.Wrapper<object>;
+  private threadObj!: Java.Wrapper<object>;
 
   constructor() {
     if (!Java.available) {
